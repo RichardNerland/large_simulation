@@ -87,4 +87,73 @@ The simulation is built on several key components:
 
 ## Acknowledgments
 
-This dashboard was developed to analyze the impact of educational ISA programs like Malengo, which facilitates educational migration to high-income countries for students in low-income countries. 
+This dashboard was developed to analyze the impact of educational ISA programs like Malengo, which facilitates educational migration to high-income countries for students in low-income countries.
+
+## Profiling and Optimization
+
+This repository includes several tools to help profile and optimize the dashboard for production deployment:
+
+### Profiling
+
+To profile the application's performance and resource usage:
+
+```
+# Install profiling dependencies
+pip install psutil memory-profiler
+
+# Run the profiling script
+python profile_app.py
+```
+
+This will analyze memory usage, CPU performance, and provide hosting recommendations based on the results.
+
+### Load Testing
+
+To simulate multiple users accessing the dashboard simultaneously:
+
+```
+# Install load testing dependencies
+pip install requests
+
+# Run the load testing script
+python load_test.py --users 10 --requests 5
+```
+
+Parameters:
+- `--url`: Base URL of the dashboard (default: http://localhost:8050)
+- `--users`: Number of concurrent users to simulate (default: 5)
+- `--requests`: Number of requests per user (default: 5)
+- `--delay`: Delay between requests in seconds (default: 1.0)
+
+### Optimization
+
+To analyze and optimize the dashboard for production:
+
+```
+# Install optimization dependencies
+pip install Flask-Caching
+
+# Analyze the dashboard without applying changes
+python optimize_for_production.py
+
+# Apply optimization changes
+python optimize_for_production.py --apply
+```
+
+Parameters:
+- `--file`: Dashboard file to optimize (default: simulation_dashboard.py)
+- `--output`: Output file path for optimized dashboard
+- `--apply`: Apply optimization changes
+- `--workers`: Number of gunicorn workers
+- `--threads`: Number of gunicorn threads
+- `--timeout`: Gunicorn timeout in seconds
+
+## Hosting Requirements
+
+Based on profiling, the recommended hosting specifications for this dashboard are:
+
+- **Memory**: At least 512MB RAM (Render Free tier is sufficient for basic usage)
+- **CPU**: At least 0.1 vCPU (Render Free tier is sufficient)
+- **Scaling**: For multiple concurrent users, consider upgrading to Render's Starter tier
+
+For detailed hosting requirements and optimization recommendations, see [Hosting Requirements](hosting_requirements.md). 
