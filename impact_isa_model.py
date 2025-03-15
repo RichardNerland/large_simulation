@@ -87,11 +87,11 @@ class Student:
     """
     Simplified student class that tracks career progression and earnings
     """
-    def __init__(self, degree_params: DegreeParams, num_years: int, 
+    def __init__(self, degree: Degree, num_years: int, 
                  counterfactual_params: CounterfactualParams,
                  starting_age: int = 22, retirement_age: int = 65):
         """Initialize a student with the given degree parameters."""
-        self.degree_params = degree_params
+        self.degree = degree
         self.num_years = num_years
         self.counterfactual_params = counterfactual_params
         
@@ -121,7 +121,7 @@ class Student:
         self.current_unemployment_spell = 0
         
         # Determine if student returns home after graduation
-        self.will_return_home = np.random.random() < degree_params.home_prob
+        self.will_return_home = np.random.random() < degree.home_prob
         
         # Track peak earnings
         self.peak_earnings = 0
@@ -133,7 +133,7 @@ class Student:
 
     def has_graduated(self, relative_year: int) -> bool:
         """Check if the student has graduated by the given year."""
-        return relative_year >= self.degree_params.years_to_complete
+        return relative_year >= self.degree.years_to_complete
 
     def calculate_earnings(self, relative_year: int, year: Year) -> float:
         """
@@ -152,7 +152,7 @@ class Student:
             
         # Check if student has returned home - if so, they should not benefit from education
         # They should earn at counterfactual levels instead
-        if self.will_return_home and relative_year >= self.degree_params.years_to_complete:
+        if self.will_return_home and relative_year >= self.degree.years_to_complete:
             self.is_home = True
             # Use counterfactual earnings for home returns
             return self.calculate_counterfactual_earnings(relative_year, year)
@@ -186,17 +186,17 @@ class Student:
             return 0
         
         # If just graduated or earnings power not set yet, set initial earnings power
-        if relative_year == self.degree_params.years_to_complete or self.earnings_power == 0:
+        if relative_year == self.degree.years_to_complete or self.earnings_power == 0:
             # Adjust initial salary for inflation at time of graduation
-            initial_salary = self.degree_params.initial_salary * year.deflator
-            salary_std = self.degree_params.salary_std * year.deflator
+            initial_salary = self.degree.mean_earnings * year.deflator
+            salary_std = self.degree.stdev * year.deflator
             self.earnings_power = max(100, np.random.normal(initial_salary, salary_std))
             self.years_experience = 0
         
         # Calculate growth based on experience
         # Apply annual growth rate with diminishing returns as experience increases
         # Ensure growth at least matches inflation to maintain real earnings
-        experience_growth = self.degree_params.annual_growth 
+        experience_growth = self.degree.experience_growth 
         inflation_growth = year.inflation_rate  # Add inflation component
         growth_factor = 1 + experience_growth + inflation_growth
         
@@ -204,7 +204,7 @@ class Student:
         self.earnings_power *= growth_factor
         
         # Cap earnings at maximum multiple of initial salary (adjusted for inflation)
-        max_earnings = self.degree_params.initial_salary * self.degree_params.max_salary_multiplier * year.deflator
+        max_earnings = self.degree.mean_earnings * 1.5 * year.deflator  # Using 1.5 as max multiplier
         self.earnings_power = min(self.earnings_power, max_earnings)
         
         # Track peak earnings
@@ -618,7 +618,7 @@ def calculate_student_statistics(student: Student, num_years: int, remittance_ra
     )
     
     return {
-        'degree_type': student.degree_params.name,
+        'degree_type': student.degree.name,
         'graduated': student.is_graduated,
         'dropped_out': not student.is_graduated,
         'lifetime_earnings': lifetime_earnings,
@@ -662,7 +662,7 @@ def simulate_impact(
     Run a simulation of the impact of an ISA program.
     
     Parameters:
-    - program_type: Type of program ('TVET', 'BA', 'MA')
+    - program_type: Type of program ('University', 'Nurse', or 'Trade')
     - initial_investment: Initial investment amount
     - num_years: Number of years to simulate
     - impact_params: Parameters for measuring social impact
@@ -684,26 +684,37 @@ def simulate_impact(
     """
     # Set default ISA parameters based on program type if not provided
     if isa_percentage is None:
-        if program_type == 'TVET':
+        if program_type == 'University':
+            isa_percentage = 0.14
+        elif program_type == 'Nurse':
             isa_percentage = 0.12
-        elif program_type == 'University':
-            isa_percentage = 0.14
+        elif program_type == 'Trade':
+            isa_percentage = 0.12
         else:
-            isa_percentage = 0.14
+            isa_percentage = 0.12
     
     if isa_cap is None:
-        if program_type == 'TVET':
-            isa_cap = 49500
-        elif program_type == 'University':
-            isa_cap = 72000
+        if program_type == 'University':
+            isa_cap = 72500
+        elif program_type == 'Nurse':
+            isa_cap = 49950
+        elif program_type == 'Trade':
+            isa_cap = 45000
         else:
-            isa_cap = 72000
+            isa_cap = 50000
     
     if isa_threshold is None:
-        isa_threshold = 5000  # Lower threshold to ensure payments are made
+        isa_threshold = 27000
     
     if price_per_student is None:
-        price_per_student = 29000 if program_type == 'University' else 16500
+        if program_type == 'University':
+            price_per_student = 29000
+        elif program_type == 'Nurse':
+            price_per_student = 16650
+        elif program_type == 'Trade':
+            price_per_student = 15000
+        else:
+            raise ValueError("Program type must be 'University', 'Nurse', or 'Trade'")
     
     # Initialize economic conditions
     year = Year(
@@ -721,10 +732,23 @@ def simulate_impact(
     if degree_params is None:
         degree_params = get_degree_for_scenario(scenario, program_type, home_prob)
     
+    # Convert DegreeParams to Degree objects
+    degrees_with_weights = [
+        (Degree(
+            name=dp.name,
+            mean_earnings=dp.initial_salary,
+            stdev=dp.salary_std,
+            experience_growth=dp.annual_growth,
+            years_to_complete=dp.years_to_complete,
+            home_prob=dp.home_prob
+        ), weight)
+        for dp, weight in degree_params
+    ]
+    
     # Initialize students
     students = []
     for i in range(60):  # Start with 60 students
-        degree_type = np.random.choice([d[0] for d in degree_params], p=[d[1] for d in degree_params])
+        degree_type = np.random.choice([d[0] for d in degrees_with_weights], p=[d[1] for d in degrees_with_weights])
         student = Student(degree_type, num_years, impact_params.counterfactual)
         student.id = i
         students.append(student)
@@ -754,7 +778,7 @@ def simulate_impact(
             student.counterfactual_earnings[relative_year] = counterfactual
             
             # Check for home return
-            if student.is_graduated and student.will_return_home and relative_year >= student.degree_params.years_to_complete:
+            if student.is_graduated and student.will_return_home and relative_year >= student.degree.years_to_complete:
                 # Mark contract as exited
                 pool.mark_contract_exit(student.id, 'home_return')
                 # Note: earnings are already handled in calculate_earnings method
@@ -787,8 +811,17 @@ def simulate_impact(
                         student.hit_cap = True
                         pool.mark_contract_exit(student.id, 'payment_cap')
                     
-                    # Record payment
+                    # Record payment in student and contract
                     student.payments[relative_year] = payment
+                    student.real_payments[relative_year] = payment / year.deflator
+                    
+                    # Find and update the student's contract
+                    for contract in pool.contracts:
+                        if contract.student_id == student.id and contract.is_active:
+                            contract.record_payment(payment)
+                            break
+                    
+                    # Update pool
                     pool.receive_payment(payment / year.deflator, student.id)
         
         # End year and capture data
@@ -807,7 +840,7 @@ def simulate_impact(
             num_new_students = max_new_students
             
             for _ in range(num_new_students):
-                degree_type = np.random.choice([d[0] for d in degree_params], p=[d[1] for d in degree_params])
+                degree_type = np.random.choice([d[0] for d in degrees_with_weights], p=[d[1] for d in degrees_with_weights])
                 student = Student(degree_type, num_years - i, impact_params.counterfactual)
                 student.id = len(students)
                 student.start_year = i
@@ -944,7 +977,7 @@ def run_impact_simulation(
     Run multiple simulations of the ISA program and aggregate results.
     
     Args:
-        program_type (str): Type of program ('TVET' or 'University')
+        program_type (str): Type of program ('University', 'Nurse', or 'Trade')
         initial_investment (float): Initial investment amount
         num_years (int): Number of years to simulate
         impact_params (ImpactParams): Parameters for impact calculation
@@ -966,16 +999,37 @@ def run_impact_simulation(
     """
     # Set defaults based on program type
     if isa_percentage is None:
-        isa_percentage = 0.14 if program_type == 'University' else 0.12
+        if program_type == 'University':
+            isa_percentage = 0.14
+        elif program_type == 'Nurse':
+            isa_percentage = 0.12
+        elif program_type == 'Trade':
+            isa_percentage = 0.12
+        else:
+            isa_percentage = 0.12
     
     if isa_cap is None:
-        isa_cap = 72000 if program_type == 'University' else 49500
+        if program_type == 'University':
+            isa_cap = 72500
+        elif program_type == 'Nurse':
+            isa_cap = 49950
+        elif program_type == 'Trade':
+            isa_cap = 45000
+        else:
+            isa_cap = 50000
     
     if price_per_student is None:
-        price_per_student = 29000 if program_type == 'University' else 16500
+        if program_type == 'University':
+            price_per_student = 29000
+        elif program_type == 'Nurse':
+            price_per_student = 16650
+        elif program_type == 'Trade':
+            price_per_student = 15000
+        else:
+            raise ValueError("Program type must be 'University', 'Nurse', or 'Trade'")
         
     if isa_threshold is None:
-        isa_threshold = 27000 if program_type == 'University' else 27000
+        isa_threshold = 27000
     
     # Run simulations
     simulation_results = []
@@ -1015,67 +1069,98 @@ def run_impact_simulation(
         'financial_metrics': aggregated['financial_metrics'],
         'time_series': aggregated['time_series'],
         'student_outcomes': aggregated['student_outcomes'],
-        'portfolio_irr': simulation_results[0]['portfolio_irr'] if num_sims == 1 else None,
+        'irr': simulation_results[0]['irr'] if num_sims == 1 else None,
         'simulation_results': simulation_results
     }
 
-def get_degree_for_scenario(scenario: str, program_type: str, home_prob: float, degree_params=None) -> DegreeParams:
-    """Helper function to get appropriate degree based on scenario"""
+def get_degree_for_scenario(scenario: str, program_type: str, home_prob: float, degree_params=None) -> List[tuple]:
+    """
+    Helper function to get appropriate degrees and their weights based on scenario.
+    
+    Returns:
+        List of tuples (DegreeParams, weight)
+    """
     if degree_params:
-        # If custom degree parameters provided, randomly select based on weights
-        degrees, weights = zip(*degree_params)
-        return np.random.choice(degrees, p=weights)
+        return degree_params
     
     if program_type == 'University':
-        # For University programs, select between BA and MA
-        weights = [0.7, 0.3]  # 70% BA, 30% MA
-        degree_type = np.random.choice(['BA', 'MA'], p=weights)
-        
-        if degree_type == 'BA':
-            return DegreeParams(
+        # For University programs
+        return [
+            (DegreeParams(
                 name='BA',
                 initial_salary=41300,
-                salary_std=13000,
-                annual_growth=0.02,
-                years_to_complete=5,
+                salary_std=6000,
+                annual_growth=0.03,
+                years_to_complete=4,
                 home_prob=home_prob
-            )
-        elif degree_type == 'MA':
-            return DegreeParams(
+            ), 0.7),  # 70% BA
+            (DegreeParams(
                 name='MA',
                 initial_salary=46709,
-                salary_std=15000,
-                annual_growth=0.025,
-                years_to_complete=7,
+                salary_std=6600,
+                annual_growth=0.04,
+                years_to_complete=6,
                 home_prob=home_prob
-            )
-        elif degree_type == 'NURSE':
-            return DegreeParams(
+            ), 0.3)   # 30% MA
+        ]
+    elif program_type == 'Nurse':
+        # For Nurse programs
+        return [
+            (DegreeParams(
                 name='NURSE',
-                initial_salary=44000,
-                salary_std=8400,
+                initial_salary=40000,
+                salary_std=4000,
                 annual_growth=0.02,
                 years_to_complete=4,
                 home_prob=home_prob
-            )
-        elif degree_type == 'VOC':
-            return DegreeParams(
-                name='VOC',
+            ), 0.25),  # 25% NURSE
+            (DegreeParams(
+                name='ASST',
                 initial_salary=31500,
-                salary_std=4800,
-                annual_growth=0.01,
+                salary_std=2800,
+                annual_growth=0.005,
                 years_to_complete=3,
                 home_prob=home_prob
-            )
-        else:  # NA
-            return DegreeParams(
+            ), 0.60),  # 60% ASST
+            (DegreeParams(
                 name='NA',
                 initial_salary=2200,
                 salary_std=640,
-                annual_growth=0.00,
+                annual_growth=0.01,
                 years_to_complete=2,
-                home_prob=1  # Fixed high home probability for NA
-            )
+                home_prob=1.0  # Fixed high home probability for NA
+            ), 0.15)   # 15% NA
+        ]
+    elif program_type == 'Trade':
+        # For Trade programs
+        return [
+            (DegreeParams(
+                name='TRADE',
+                initial_salary=35000,
+                salary_std=3000,
+                annual_growth=0.02,
+                years_to_complete=3,
+                home_prob=home_prob
+            ), 0.40),  # 40% TRADE
+            (DegreeParams(
+                name='ASST',
+                initial_salary=31500,
+                salary_std=2800,
+                annual_growth=0.005,
+                years_to_complete=3,
+                home_prob=home_prob
+            ), 0.40),  # 40% ASST
+            (DegreeParams(
+                name='NA',
+                initial_salary=2200,
+                salary_std=640,
+                annual_growth=0.01,
+                years_to_complete=2,
+                home_prob=1.0  # Fixed high home probability for NA
+            ), 0.20)   # 20% NA
+        ]
+    else:
+        raise ValueError("Program type must be 'University', 'Nurse', or 'Trade'")
 
 def aggregate_simulation_results(results: List[Dict]) -> Dict:
     """Aggregate results across multiple simulations"""
@@ -1084,39 +1169,160 @@ def aggregate_simulation_results(results: List[Dict]) -> Dict:
     # Calculate averages for impact metrics
     impact_metrics = {
         'avg_utility_gain': np.mean([
-            r['impact_metrics']['avg_utility_gain']
+            r['student_metrics']['avg_total_utility_gain']
             for r in results
         ]),
         'avg_earnings_gain': np.mean([
-            r['impact_metrics']['avg_earnings_gain']
+            r['student_metrics']['avg_earnings_gain']
             for r in results
         ]),
         'avg_remittance_gain': np.mean([
-            r['impact_metrics']['avg_remittance_gain']
+            r['student_metrics']['avg_remittance_gain']
             for r in results
         ])
     }
     
     # Calculate financial metrics
     financial_metrics = {
-        'avg_total_payments': np.mean([r['financial_metrics']['avg_total_payments'] for r in results]),
-        'avg_students_funded': np.mean([r['financial_metrics']['avg_students_funded'] for r in results])
+        'avg_total_payments': np.mean([r['total_payments'] for r in results]),
+        'avg_students_funded': np.mean([r['total_students'] for r in results])
     }
     
-    # Aggregate time series data
-    time_series = {
-        'utility': np.mean([r['time_series']['utility'] for r in results], axis=0),
-        'counterfactual_utility': np.mean([r['time_series']['counterfactual_utility'] for r in results], axis=0),
-        'earnings': np.mean([r['time_series']['earnings'] for r in results], axis=0),
-        'counterfactual_earnings': np.mean([r['time_series']['counterfactual_earnings'] for r in results], axis=0),
-        'remittances': np.mean([r['time_series']['remittances'] for r in results], axis=0),
-        'counterfactual_remittances': np.mean([r['time_series']['counterfactual_remittances'] for r in results], axis=0),
-        'payments': np.mean([r['time_series']['payments'] for r in results], axis=0)
+    # Aggregate time series data if available
+    time_series = {}
+    if results[0].get('yearly_data'):
+        yearly_data = [r['yearly_data'] for r in results]
+        time_series = {
+            'cash': np.mean([
+                [year['cash'] for year in sim_data]
+                for sim_data in yearly_data
+            ], axis=0),
+            'returns': np.mean([
+                [year['returns'] for year in sim_data]
+                for sim_data in yearly_data
+            ], axis=0),
+            'active_contracts': np.mean([
+                [year['active_contracts'] for year in sim_data]
+                for sim_data in yearly_data
+            ], axis=0)
+        }
+    
+    # Calculate student outcomes
+    student_outcomes = {
+        'graduation_rate': np.mean([
+            r['students_educated'] / r['total_students']
+            for r in results
+        ]),
+        'avg_irr': np.mean([r['irr'] for r in results])
     }
     
     return {
         'impact_metrics': impact_metrics,
         'financial_metrics': financial_metrics,
         'time_series': time_series,
-        'student_outcomes': {}  # Placeholder for additional student outcome metrics
-    } 
+        'student_outcomes': student_outcomes
+    }
+
+def main():
+    """
+    Main function to demonstrate the usage of the ISA impact model.
+    
+    This function runs several example simulations and prints the results.
+    """
+    import argparse
+    
+    parser = argparse.ArgumentParser(description='Run ISA impact simulations')
+    parser.add_argument('--program', type=str, default='Nurse', choices=['University', 'Nurse', 'Trade'],
+                        help='Program type (University, Nurse, or Trade)')
+    parser.add_argument('--scenario', type=str, default='baseline', 
+                        choices=['baseline', 'conservative', 'optimistic', 'custom'],
+                        help='Scenario to run')
+    parser.add_argument('--sims', type=int, default=1, help='Number of simulations')
+    parser.add_argument('--seed', type=int, default=None, help='Random seed for reproducibility')
+    parser.add_argument('--investment', type=float, default=1000000, help='Initial investment amount')
+    parser.add_argument('--years', type=int, default=55, help='Number of years to simulate')
+    parser.add_argument('--remittance-rate', type=float, default=0.1, help='Remittance rate')
+    parser.add_argument('--home-prob', type=float, default=0.1, help='Probability of returning home')
+    
+    args = parser.parse_args()
+    
+    # Get price per student based on program type
+    if args.program == 'University':
+        price_per_student = 29000
+    elif args.program == 'Nurse':
+        price_per_student = 16650
+    elif args.program == 'Trade':
+        price_per_student = 15000
+    else:
+        raise ValueError("Program type must be 'University', 'Nurse', or 'Trade'")
+    
+    # Calculate initial number of students that can be funded
+    # Reserve 2% of investment for cash buffer
+    available_for_students = args.investment * 0.98
+    initial_students = int(available_for_students / price_per_student)
+    
+    print(f"\nRunning {args.scenario} scenario for {args.program} program")
+    print(f"Initial investment: ${args.investment:,.2f}")
+    print(f"Price per student: ${price_per_student:,.2f}")
+    print(f"Initial students that can be funded: {initial_students}")
+    
+    # Set random seed if provided
+    if args.seed is not None:
+        np.random.seed(args.seed)
+    
+    # Set up impact parameters
+    impact_params = ImpactParams(
+        discount_rate=0.05,
+        counterfactual=CounterfactualParams(
+            base_earnings=2200,
+            earnings_growth=0.01,
+            remittance_rate=0.15,
+            employment_rate=0.9
+        ),
+        ppp_multiplier=0.42,
+        health_benefit_per_dollar=0.00003,
+        migration_influence_factor=0.05,
+        moral_weight=1.44
+    )
+    
+    # Run simulation
+    results = run_impact_simulation(
+        program_type=args.program,
+        initial_investment=args.investment,
+        num_years=args.years,
+        impact_params=impact_params,
+        num_sims=args.sims,
+        scenario=args.scenario,
+        remittance_rate=args.remittance_rate,
+        home_prob=args.home_prob
+    )
+    
+    # Print standard summary
+    print("\nPortfolio Performance Summary")
+    print("=" * 40)
+    print(f"Initial Investment: ${results['initial_investment']:,.2f}")
+    print(f"Price per Student: ${results['price_per_student']:,.2f}")
+    print(f"Initial Students Funded: {initial_students}")
+    print(f"\nISA Parameters:")
+    print(f"  - Percentage: {results['isa_percentage']*100:.1f}%")
+    print(f"  - Cap: ${results['isa_cap']:,.2f}")
+    print(f"  - Threshold: ${results['isa_threshold']:,.2f}")
+    
+    print("\nFinancial Metrics:")
+    print(f"Average Total Payments: ${results['financial_metrics']['avg_total_payments']:,.2f}")
+    print(f"Average Total Students Funded: {results['financial_metrics']['avg_students_funded']:.1f}")
+    print(f"Average Students per Initial Investment: {results['financial_metrics']['avg_students_funded']/initial_students:.2f}x")
+    
+    print("\nImpact Metrics:")
+    print(f"Average Utility Gain: {results['impact_metrics']['avg_utility_gain']:.2f}")
+    print(f"Average Earnings Gain: ${results['impact_metrics']['avg_earnings_gain']:,.2f}")
+    print(f"Average Remittance Gain: ${results['impact_metrics']['avg_remittance_gain']:,.2f}")
+    
+    # Print student outcomes if available
+    if results.get('student_outcomes'):
+        print("\nStudent Outcomes:")
+        for metric, value in results['student_outcomes'].items():
+            print(f"{metric.replace('_', ' ').title()}: {value:.2f}")
+
+if __name__ == "__main__":
+    main() 

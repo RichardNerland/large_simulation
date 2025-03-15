@@ -126,10 +126,11 @@ dashboard_layout = html.Div([
                 dcc.RadioItems(
                     id='program-type',
                     options=[
-                        {'label': 'TVET', 'value': 'TVET'},
-                        {'label': 'University', 'value': 'University'}
+                        {'label': 'University', 'value': 'University'},
+                        {'label': 'Nurse', 'value': 'Nurse'},
+                        {'label': 'Trade', 'value': 'Trade'}
                     ],
-                    value='TVET',
+                    value='Nurse',
                     labelStyle={'display': 'inline-block', 'marginRight': '20px', 'fontSize': '16px'}
                 )
             ], style={'marginBottom': '20px'}),
@@ -140,10 +141,14 @@ dashboard_layout = html.Div([
                          style={'width': '100%', 'padding': '8px', 'borderRadius': '5px', 'border': '1px solid #ddd'})
             ], style={'marginBottom': '20px'}),
             
+            # Add a display for calculated initial students
+            html.Div(id='calculated-students', style={'marginBottom': '20px', 'padding': '10px', 
+                                                    'backgroundColor': '#f0f0f0', 'borderRadius': '5px'}),
+            
             # Hidden inputs with default values
             html.Div([
-                dcc.Input(id='home-prob', type='number', value=15, style={'display': 'none'}),
-                dcc.Input(id='unemployment-rate', type='number', value=5, style={'display': 'none'}),
+                dcc.Input(id='home-prob', type='number', value=10, style={'display': 'none'}),
+                dcc.Input(id='unemployment-rate', type='number', value=8, style={'display': 'none'}),
                 dcc.Input(id='inflation-rate', type='number', value=2, style={'display': 'none'})
             ]),
             
@@ -426,14 +431,29 @@ def update_results(n_clicks, program_type, initial_investment,
     degree_data = []
     for percentile in percentiles:
         params = create_degree_params(percentile, program_type)
-        degree_data.append({
-            'Percentile': percentile.upper(),
-            'VOC (%)': f"{params[0][1]*100:.0f}%",
-            'NURSE (%)': f"{params[1][1]*100:.0f}%",
-            'NA (%)': f"{params[2][1]*100:.0f}%",
-            'BA (%)': f"{params[3][1]*100:.0f}%",
-            'MA (%)': f"{params[4][1]*100:.0f}%"
-        })
+        row = {'Percentile': percentile.upper()}
+        
+        # Add percentages for each degree type based on program type
+        if program_type == 'University':
+            row.update({
+                'BA (%)': f"{params[0][1]*100:.0f}%",
+                'MA (%)': f"{params[1][1]*100:.0f}%",
+                'NA (%)': f"{params[2][1]*100:.0f}%"
+            })
+        elif program_type == 'Nurse':
+            row.update({
+                'NURSE (%)': f"{params[0][1]*100:.0f}%",
+                'ASST (%)': f"{params[1][1]*100:.0f}%",
+                'NA (%)': f"{params[2][1]*100:.0f}%"
+            })
+        else:  # Trade program
+            row.update({
+                'TRADE (%)': f"{params[0][1]*100:.0f}%",
+                'ASST (%)': f"{params[1][1]*100:.0f}%",
+                'NA (%)': f"{params[2][1]*100:.0f}%"
+            })
+        
+        degree_data.append(row)
     
     degree_df = pd.DataFrame(degree_data)
     
@@ -784,152 +804,216 @@ def update_results(n_clicks, program_type, initial_investment,
     
     return summary_table, tables_div, impact_fig, dollars_fig, utility_fig, perf_fig, comparison_fig, cash_flow_table
 
-def create_degree_params(percentile, program_type='TVET'):
+# Add a callback to update the calculated students display
+@app.callback(
+    Output('calculated-students', 'children'),
+    [Input('program-type', 'value'),
+     Input('initial-investment', 'value')]
+)
+def update_calculated_students(program_type, initial_investment):
+    if not initial_investment:
+        return "Please enter an initial investment amount"
+    
+    # Get price per student based on program type
+    if program_type == 'University':
+        price_per_student = 29000
+    elif program_type == 'Nurse':
+        price_per_student = 16650
+    elif program_type == 'Trade':
+        price_per_student = 15000
+    else:
+        return "Invalid program type"
+    
+    # Calculate number of students (reserving 2% for cash buffer)
+    available_for_students = initial_investment * 0.98
+    initial_students = int(available_for_students / price_per_student)
+    
+    return html.Div([
+        html.P(f"Price per student: ${price_per_student:,.2f}", style={'marginBottom': '5px'}),
+        html.P(f"Initial students that can be funded: {initial_students}", style={'fontWeight': 'bold'})
+    ])
+
+def create_degree_params(percentile, program_type='Nurse'):
     """Create degree parameters based on percentile scenario."""
     # Set degree distribution based on percentile
     
-    if program_type == 'TVET':
-        # TVET program distributions
+    if program_type == 'Nurse':
+        # Nurse program distributions
         if percentile == 'p10':
-            voc_pct = 0.30
-            nurse_pct = 0.10
-            na_pct = 0.60
-            ba_pct = 0.0
-            ma_pct = 0.0
+            nurse_pct = 0.13
+            asst_pct = 0.32
+            na_pct = 0.55
         elif percentile == 'p25':
-            voc_pct = 0.50
-            nurse_pct = 0.15
+            nurse_pct = 0.20
+            asst_pct = 0.45
             na_pct = 0.35
-            ba_pct = 0.0
-            ma_pct = 0.0
         elif percentile == 'p50':
-            voc_pct = 0.50
             nurse_pct = 0.30
-            na_pct = 0.20
-            ba_pct = 0.0
-            ma_pct = 0.0
+            asst_pct = 0.60
+            na_pct = 0.1
         elif percentile == 'p75':
-            voc_pct = 0.55
-            nurse_pct = 0.40
-            na_pct = 0.05
-            ba_pct = 0.0
-            ma_pct = 0.0
+            nurse_pct = 0.45
+            asst_pct = 0.55
+            na_pct = 0.0
         elif percentile == 'p90':
-            voc_pct = 0.3
-            nurse_pct = 0.65
-            na_pct = 0.05
-            ba_pct = 0.0
-            ma_pct = 0.0
+            nurse_pct = 0.60
+            asst_pct = 0.40
+            na_pct = 0.00
         else:
             # Default to median
-            voc_pct = 0.50
             nurse_pct = 0.30
-            na_pct = 0.20
-            ba_pct = 0.0
-            ma_pct = 0.0
-    else:
-        # University program distributions
+            asst_pct = 0.55
+            na_pct = 0.15
+            
+        return [
+            (DegreeParams(
+                name='NURSE',
+                initial_salary=40000,
+                salary_std=4000,
+                annual_growth=0.02,
+                years_to_complete=4,
+                home_prob=0.1
+            ), nurse_pct),
+            (DegreeParams(
+                name='ASST',
+                initial_salary=31500,
+                salary_std=2800,
+                annual_growth=0.005,
+                years_to_complete=3,
+                home_prob=0.1
+            ), asst_pct),
+            (DegreeParams(
+                name='NA',
+                initial_salary=2200,
+                salary_std=640,
+                annual_growth=0.01,
+                years_to_complete=2,
+                home_prob=1.0
+            ), na_pct)
+        ]
+    
+    elif program_type == 'Trade':
+        # Trade program distributions
         if percentile == 'p10':
-            voc_pct = 0.24
-            nurse_pct = 0.0
-            na_pct = 0.52
-            ba_pct = 0.16
-            ma_pct = 0.08
+            trade_pct = 0.20
+            asst_pct = 0.25
+            na_pct = 0.55
         elif percentile == 'p25':
-            voc_pct = 0.33
-            nurse_pct = 0.0
-            na_pct = 0.34
-            ba_pct = 0.22
-            ma_pct = 0.11
+            trade_pct = 0.20
+            asst_pct = 0.45
+            na_pct = 0.35
         elif percentile == 'p50':
-            voc_pct = 0.25
-            nurse_pct = 0.0
-            na_pct = 0.09
-            ba_pct = 0.43
-            ma_pct = 0.23
+            trade_pct = 0.40
+            asst_pct = 0.45
+            na_pct = 0.15
         elif percentile == 'p75':
-            voc_pct = 0.2
-            nurse_pct = 0.0
+            trade_pct = 0.5
+            asst_pct = 0.5
             na_pct = 0.0
-            ba_pct = 0.55
-            ma_pct = 0.25
         elif percentile == 'p90':
-            voc_pct = 0.1
-            nurse_pct = 0.0
-            na_pct = 0.0
-            ba_pct = 0.5
-            ma_pct = 0.4
+            trade_pct = 0.75
+            asst_pct = 0.25
+            na_pct = 0.00
         else:
             # Default to median
-            voc_pct = 0.25
-            nurse_pct = 0.0
-            na_pct = 0.09
-            ba_pct = 0.43
-            ma_pct = 0.23
+            trade_pct = 0.40
+            asst_pct = 0.40
+            na_pct = 0.20
+            
+        return [
+            (DegreeParams(
+                name='TRADE',
+                initial_salary=35000,
+                salary_std=3000,
+                annual_growth=0.02,
+                years_to_complete=3,
+                home_prob=0.1
+            ), trade_pct),
+            (DegreeParams(
+                name='ASST',
+                initial_salary=31500,
+                salary_std=2800,
+                annual_growth=0.005,
+                years_to_complete=3,
+                home_prob=0.1
+            ), asst_pct),
+            (DegreeParams(
+                name='NA',
+                initial_salary=2200,
+                salary_std=640,
+                annual_growth=0.01,
+                years_to_complete=2,
+                home_prob=1.0
+            ), na_pct)
+        ]
     
-    # Ensure probabilities sum to 1
-    total = voc_pct + nurse_pct + na_pct + ba_pct + ma_pct
-    if total != 1.0:
-        voc_pct = voc_pct / total
-        nurse_pct = nurse_pct / total
-        na_pct = na_pct / total
-        ba_pct = ba_pct / total
-        ma_pct = ma_pct / total
-    
-    # Create DegreeParams objects
-    voc_params = DegreeParams(
-        name='VOC',
-        initial_salary=31500,
-        salary_std=4800,
-        annual_growth=0.01,
-        years_to_complete=3,
-        home_prob=0.15
-    )
-    
-    nurse_params = DegreeParams(
-        name='NURSE',
-        initial_salary=44000,
-        salary_std=8000,
-        annual_growth=0.01,
-        years_to_complete=4,
-        home_prob=0.05
-    )
-    
-    na_params = DegreeParams(
-        name='NA',
-        initial_salary=2200,
-        salary_std=640,
-        annual_growth=0.02,
-        years_to_complete=0,
-        home_prob=0.8
-    )
-    
-    ba_params = DegreeParams(
-        name='BA',
-        initial_salary=41300,
-        salary_std=13000,
-        annual_growth=0.03,
-        years_to_complete=4,
-        home_prob=0.1
-    )
-    
-    ma_params = DegreeParams(
-        name='MA',
-        initial_salary=55000,
-        salary_std=15000,
-        annual_growth=0.035,
-        years_to_complete=6,
-        home_prob=0.05
-    )
-    
-    # Return list of (degree_params, probability) tuples
-    return [
-        (voc_params, voc_pct),
-        (nurse_params, nurse_pct),
-        (na_params, na_pct),
-        (ba_params, ba_pct),
-        (ma_params, ma_pct)
-    ]
+    else:  # University program
+        if percentile == 'p10':
+            ba_pct = 0.20
+            ma_pct = 0.10
+            asst_pct = 0.30
+            na_pct = 0.4
+        elif percentile == 'p25':
+            ba_pct = 0.32
+            ma_pct = 0.11
+            asst_pct = 0.42
+            na_pct = 0.15
+        elif percentile == 'p50':
+            ba_pct = 0.45
+            ma_pct = 0.24
+            asst_pct = 0.27
+            na_pct = 0.04
+        elif percentile == 'p75':
+            ba_pct = 0.63
+            ma_pct = 0.33
+            asst_pct = 0.02
+            na_pct = 0.02
+        elif percentile == 'p90':
+            ba_pct = 0.63
+            ma_pct = 0.33
+            asst_pct = 0.02
+            na_pct = 0.02
+        else:
+            # Default to median
+            ba_pct = 0.45
+            ma_pct = 0.24
+            asst_pct = 0.27
+            na_pct = 0.04
+        
+        return [
+            (DegreeParams(
+                name='BA',
+                initial_salary=41300,
+                salary_std=6000,
+                annual_growth=0.03,
+                years_to_complete=4,
+                home_prob=0.1
+            ), ba_pct),
+            (DegreeParams(
+                name='MA',
+                initial_salary=46709,
+                salary_std=6600,
+                annual_growth=0.04,
+                years_to_complete=6,
+                home_prob=0.1
+            ), ma_pct),
+            (DegreeParams(
+                name='ASST',
+                initial_salary=31500,
+                salary_std=2800,
+                annual_growth=0.005,
+                years_to_complete=3,
+                home_prob=0.1
+            ), asst_pct),
+            (DegreeParams(
+                name='NA',
+                initial_salary=2200,
+                salary_std=640,
+                annual_growth=0.01,
+                years_to_complete=2,
+                home_prob=1.0
+            ), na_pct)
+        ]
 
 # Run the app
 if __name__ == '__main__':
