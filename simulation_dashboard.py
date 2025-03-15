@@ -372,11 +372,11 @@ def update_results(n_clicks, program_type, initial_investment,
         results = simulate_impact(
             program_type=program_type,
             initial_investment=initial_investment,
-            num_years=55,
+            num_years=45,
             impact_params=impact_params,
             num_sims=1,
             scenario='baseline',
-            remittance_rate=0.15,
+            remittance_rate=0.1,
             home_prob=home_prob,
             degree_params=create_degree_params(percentile, program_type),
             initial_unemployment_rate=unemployment_rate,
@@ -420,7 +420,7 @@ def update_results(n_clicks, program_type, initial_investment,
             html.H4("Simulation Information"),
             html.P(f"Program Type: {program_type}"),
             html.P(f"Initial Investment: ${initial_investment:,}"),
-            html.P(f"Simulation Length: 55 years")
+            html.P(f"Simulation Length: 45 years")
         ], style={'marginTop': '20px'})
     ])
     
