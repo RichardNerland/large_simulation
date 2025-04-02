@@ -1,5 +1,5 @@
 import dash
-from dash import dcc, html, Input, Output, State, callback_context
+from dash import dcc, html, Input, Output, State, callback_context, dash_table
 import plotly.graph_objects as go
 import plotly.express as px
 import pandas as pd
@@ -10,7 +10,6 @@ import subprocess
 import base64
 import io
 from datetime import datetime
-import dash_table
 from plotly.subplots import make_subplots
 
 # Import simulation functions
@@ -126,9 +125,9 @@ dashboard_layout = html.Div([
                 dcc.RadioItems(
                     id='program-type',
                     options=[
-                        {'label': 'University', 'value': 'University'},
-                        {'label': 'Nurse', 'value': 'Nurse'},
-                        {'label': 'Trade', 'value': 'Trade'}
+                        {'label': 'Uganda', 'value': 'University'},
+                        {'label': 'Kenya', 'value': 'Nurse'},
+                        {'label': 'Rwanda', 'value': 'Trade'}
                     ],
                     value='Nurse',
                     labelStyle={'display': 'inline-block', 'marginRight': '20px', 'fontSize': '16px'}
@@ -437,20 +436,23 @@ def update_results(n_clicks, program_type, initial_investment,
         if program_type == 'University':
             row.update({
                 'BA (%)': f"{params[0][1]*100:.0f}%",
-                'MA (%)': f"{params[1][1]*100:.0f}%",
-                'NA (%)': f"{params[2][1]*100:.0f}%"
+                'MA (%)': f"{params[1][1]*100:.0f}%", 
+                'ASST_SHIFT (%)': f"{params[2][1]*100:.0f}%",
+                'NA (%)': f"{params[3][1]*100:.0f}%"
             })
         elif program_type == 'Nurse':
             row.update({
                 'NURSE (%)': f"{params[0][1]*100:.0f}%",
                 'ASST (%)': f"{params[1][1]*100:.0f}%",
-                'NA (%)': f"{params[2][1]*100:.0f}%"
+                'ASST_SHIFT (%)': f"{params[2][1]*100:.0f}%",
+                'NA (%)': f"{params[3][1]*100:.0f}%"
             })
         else:  # Trade program
             row.update({
                 'TRADE (%)': f"{params[0][1]*100:.0f}%",
                 'ASST (%)': f"{params[1][1]*100:.0f}%",
-                'NA (%)': f"{params[2][1]*100:.0f}%"
+                'ASST_SHIFT (%)': f"{params[2][1]*100:.0f}%",
+                'NA (%)': f"{params[3][1]*100:.0f}%"
             })
         
         degree_data.append(row)
@@ -817,10 +819,13 @@ def update_calculated_students(program_type, initial_investment):
     # Get price per student based on program type
     if program_type == 'University':
         price_per_student = 29000
+        program_name = 'Uganda'
     elif program_type == 'Nurse':
         price_per_student = 16650
+        program_name = 'Kenya'
     elif program_type == 'Trade':
         price_per_student = 15000
+        program_name = 'Rwanda'
     else:
         return "Invalid program type"
     
@@ -829,7 +834,7 @@ def update_calculated_students(program_type, initial_investment):
     initial_students = int(available_for_students / price_per_student)
     
     return html.Div([
-        html.P(f"Price per student: ${price_per_student:,.2f}", style={'marginBottom': '5px'}),
+        html.P(f"{program_name} Program - Price per student: ${price_per_student:,.2f}", style={'marginBottom': '5px'}),
         html.P(f"Initial students that can be funded: {initial_students}", style={'fontWeight': 'bold'})
     ])
 
@@ -837,32 +842,38 @@ def create_degree_params(percentile, program_type='Nurse'):
     """Create degree parameters based on percentile scenario."""
     # Set degree distribution based on percentile
     
-    if program_type == 'Nurse':
+    if program_type == 'Nurse':  # Kenya program
         # Nurse program distributions
         if percentile == 'p10':
             nurse_pct = 0.13
             asst_pct = 0.32
+            asst_shift_pct = 0.0  # Add ASST_SHIFT
             na_pct = 0.55
         elif percentile == 'p25':
             nurse_pct = 0.20
-            asst_pct = 0.45
+            asst_pct = 0.30  # Reduced from 0.45
+            asst_shift_pct = 0.15  # Add ASST_SHIFT (33% of original 0.45)
             na_pct = 0.35
         elif percentile == 'p50':
             nurse_pct = 0.30
-            asst_pct = 0.60
+            asst_pct = 0.40  # Reduced from 0.60
+            asst_shift_pct = 0.20  # Add ASST_SHIFT (33% of original 0.60)
             na_pct = 0.1
         elif percentile == 'p75':
             nurse_pct = 0.45
-            asst_pct = 0.55
+            asst_pct = 0.37  # Reduced from 0.55
+            asst_shift_pct = 0.18  # Add ASST_SHIFT (33% of original 0.55)
             na_pct = 0.0
         elif percentile == 'p90':
             nurse_pct = 0.60
-            asst_pct = 0.40
+            asst_pct = 0.27  # Reduced from 0.40
+            asst_shift_pct = 0.13  # Add ASST_SHIFT (33% of original 0.40)
             na_pct = 0.00
         else:
             # Default to median
             nurse_pct = 0.30
-            asst_pct = 0.55
+            asst_pct = 0.40  # Reduced from 0.55
+            asst_shift_pct = 0.15  # Add ASST_SHIFT (33% of original 0.55)
             na_pct = 0.15
             
         return [
@@ -883,6 +894,14 @@ def create_degree_params(percentile, program_type='Nurse'):
                 home_prob=0.1
             ), asst_pct),
             (DegreeParams(
+                name='ASST_SHIFT',
+                initial_salary=31500,
+                salary_std=2800,
+                annual_growth=0.005,
+                years_to_complete=6,  # 6 years to complete
+                home_prob=0.1
+            ), asst_shift_pct),
+            (DegreeParams(
                 name='NA',
                 initial_salary=2200,
                 salary_std=640,
@@ -892,32 +911,38 @@ def create_degree_params(percentile, program_type='Nurse'):
             ), na_pct)
         ]
     
-    elif program_type == 'Trade':
+    elif program_type == 'Trade':  # Rwanda program
         # Trade program distributions
         if percentile == 'p10':
             trade_pct = 0.20
-            asst_pct = 0.25
+            asst_pct = 0.17  # Reduced from 0.25
+            asst_shift_pct = 0.08  # Add ASST_SHIFT (33% of original 0.25)
             na_pct = 0.55
         elif percentile == 'p25':
             trade_pct = 0.20
-            asst_pct = 0.45
+            asst_pct = 0.30  # Reduced from 0.45
+            asst_shift_pct = 0.15  # Add ASST_SHIFT (33% of original 0.45)
             na_pct = 0.35
         elif percentile == 'p50':
             trade_pct = 0.40
-            asst_pct = 0.45
+            asst_pct = 0.30  # Reduced from 0.45
+            asst_shift_pct = 0.15  # Add ASST_SHIFT (33% of original 0.45)
             na_pct = 0.15
         elif percentile == 'p75':
             trade_pct = 0.5
-            asst_pct = 0.5
+            asst_pct = 0.33  # Reduced from 0.5
+            asst_shift_pct = 0.17  # Add ASST_SHIFT (33% of original 0.5)
             na_pct = 0.0
         elif percentile == 'p90':
             trade_pct = 0.75
-            asst_pct = 0.25
+            asst_pct = 0.17  # Reduced from 0.25
+            asst_shift_pct = 0.08  # Add ASST_SHIFT (33% of original 0.25)
             na_pct = 0.00
         else:
             # Default to median
             trade_pct = 0.40
-            asst_pct = 0.40
+            asst_pct = 0.27  # Reduced from 0.40
+            asst_shift_pct = 0.13  # Add ASST_SHIFT (33% of original 0.40)
             na_pct = 0.20
             
         return [
@@ -938,6 +963,14 @@ def create_degree_params(percentile, program_type='Nurse'):
                 home_prob=0.1
             ), asst_pct),
             (DegreeParams(
+                name='ASST_SHIFT',
+                initial_salary=31500,
+                salary_std=2800,
+                annual_growth=0.005,
+                years_to_complete=6,  # 6 years to complete
+                home_prob=0.1
+            ), asst_shift_pct),
+            (DegreeParams(
                 name='NA',
                 initial_salary=2200,
                 salary_std=640,
@@ -947,37 +980,37 @@ def create_degree_params(percentile, program_type='Nurse'):
             ), na_pct)
         ]
     
-    else:  # University program
+    else:  # University program (Uganda program)
         if percentile == 'p10':
             ba_pct = 0.20
             ma_pct = 0.10
-            asst_pct = 0.30
+            asst_shift_pct = 0.30  # This replaces ASST completely
             na_pct = 0.4
         elif percentile == 'p25':
             ba_pct = 0.32
             ma_pct = 0.11
-            asst_pct = 0.42
+            asst_shift_pct = 0.42  # This replaces ASST completely
             na_pct = 0.15
         elif percentile == 'p50':
             ba_pct = 0.45
             ma_pct = 0.24
-            asst_pct = 0.27
+            asst_shift_pct = 0.27  # This replaces ASST completely
             na_pct = 0.04
         elif percentile == 'p75':
             ba_pct = 0.63
             ma_pct = 0.33
-            asst_pct = 0.02
+            asst_shift_pct = 0.02  # This replaces ASST completely
             na_pct = 0.02
         elif percentile == 'p90':
             ba_pct = 0.63
             ma_pct = 0.33
-            asst_pct = 0.02
+            asst_shift_pct = 0.02  # This replaces ASST completely
             na_pct = 0.02
         else:
             # Default to median
             ba_pct = 0.45
             ma_pct = 0.24
-            asst_pct = 0.27
+            asst_shift_pct = 0.27  # This replaces ASST completely
             na_pct = 0.04
         
         return [
@@ -998,13 +1031,13 @@ def create_degree_params(percentile, program_type='Nurse'):
                 home_prob=0.1
             ), ma_pct),
             (DegreeParams(
-                name='ASST',
+                name='ASST_SHIFT',
                 initial_salary=31500,
                 salary_std=2800,
                 annual_growth=0.005,
-                years_to_complete=3,
+                years_to_complete=6,  # 6 years to complete
                 home_prob=0.1
-            ), asst_pct),
+            ), asst_shift_pct),
             (DegreeParams(
                 name='NA',
                 initial_salary=2200,
@@ -1017,4 +1050,4 @@ def create_degree_params(percentile, program_type='Nurse'):
 
 # Run the app
 if __name__ == '__main__':
-    app.run_server(debug=True) 
+    app.run(debug=True) 

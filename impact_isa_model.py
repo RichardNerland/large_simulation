@@ -662,7 +662,7 @@ def simulate_impact(
     Run a simulation of the impact of an ISA program.
     
     Parameters:
-    - program_type: Type of program ('University', 'Nurse', or 'Trade')
+    - program_type: Type of program ('University' (Uganda), 'Nurse' (Kenya), or 'Trade' (Rwanda))
     - initial_investment: Initial investment amount
     - num_years: Number of years to simulate
     - impact_params: Parameters for measuring social impact
@@ -684,21 +684,21 @@ def simulate_impact(
     """
     # Set default ISA parameters based on program type if not provided
     if isa_percentage is None:
-        if program_type == 'University':
+        if program_type == 'University':  # Uganda program
             isa_percentage = 0.14
-        elif program_type == 'Nurse':
+        elif program_type == 'Nurse':     # Kenya program
             isa_percentage = 0.12
-        elif program_type == 'Trade':
+        elif program_type == 'Trade':     # Rwanda program
             isa_percentage = 0.12
         else:
             isa_percentage = 0.12
     
     if isa_cap is None:
-        if program_type == 'University':
+        if program_type == 'University':  # Uganda program
             isa_cap = 72500
-        elif program_type == 'Nurse':
+        elif program_type == 'Nurse':     # Kenya program
             isa_cap = 49950
-        elif program_type == 'Trade':
+        elif program_type == 'Trade':     # Rwanda program
             isa_cap = 45000
         else:
             isa_cap = 50000
@@ -707,14 +707,14 @@ def simulate_impact(
         isa_threshold = 27000
     
     if price_per_student is None:
-        if program_type == 'University':
+        if program_type == 'University':  # Uganda program
             price_per_student = 29000
-        elif program_type == 'Nurse':
+        elif program_type == 'Nurse':     # Kenya program
             price_per_student = 16650
-        elif program_type == 'Trade':
+        elif program_type == 'Trade':     # Rwanda program
             price_per_student = 15000
         else:
-            raise ValueError("Program type must be 'University', 'Nurse', or 'Trade'")
+            raise ValueError("Program type must be 'University' (Uganda), 'Nurse' (Kenya), or 'Trade' (Rwanda)")
     
     # Initialize economic conditions
     year = Year(
@@ -977,7 +977,7 @@ def run_impact_simulation(
     Run multiple simulations of the ISA program and aggregate results.
     
     Args:
-        program_type (str): Type of program ('University', 'Nurse', or 'Trade')
+        program_type (str): Type of program ('University' (Uganda), 'Nurse' (Kenya), or 'Trade' (Rwanda))
         initial_investment (float): Initial investment amount
         num_years (int): Number of years to simulate
         impact_params (ImpactParams): Parameters for impact calculation
@@ -999,34 +999,34 @@ def run_impact_simulation(
     """
     # Set defaults based on program type
     if isa_percentage is None:
-        if program_type == 'University':
+        if program_type == 'University':  # Uganda program
             isa_percentage = 0.14
-        elif program_type == 'Nurse':
+        elif program_type == 'Nurse':     # Kenya program
             isa_percentage = 0.12
-        elif program_type == 'Trade':
+        elif program_type == 'Trade':     # Rwanda program
             isa_percentage = 0.12
         else:
             isa_percentage = 0.12
     
     if isa_cap is None:
-        if program_type == 'University':
+        if program_type == 'University':  # Uganda program
             isa_cap = 72500
-        elif program_type == 'Nurse':
+        elif program_type == 'Nurse':     # Kenya program
             isa_cap = 49950
-        elif program_type == 'Trade':
+        elif program_type == 'Trade':     # Rwanda program
             isa_cap = 45000
         else:
             isa_cap = 50000
     
     if price_per_student is None:
-        if program_type == 'University':
+        if program_type == 'University':  # Uganda program
             price_per_student = 29000
-        elif program_type == 'Nurse':
+        elif program_type == 'Nurse':     # Kenya program
             price_per_student = 16650
-        elif program_type == 'Trade':
+        elif program_type == 'Trade':     # Rwanda program
             price_per_student = 15000
         else:
-            raise ValueError("Program type must be 'University', 'Nurse', or 'Trade'")
+            raise ValueError("Program type must be 'University' (Uganda), 'Nurse' (Kenya), or 'Trade' (Rwanda)")
         
     if isa_threshold is None:
         isa_threshold = 27000
@@ -1083,8 +1083,9 @@ def get_degree_for_scenario(scenario: str, program_type: str, home_prob: float, 
     if degree_params:
         return degree_params
     
-    if program_type == 'University':
+    if program_type == 'University':  # Uganda program
         # For University programs
+        # All asst in Uganda program should be moved to asst_shift (students begin pursuing bachelors)
         return [
             (DegreeParams(
                 name='BA',
@@ -1101,10 +1102,23 @@ def get_degree_for_scenario(scenario: str, program_type: str, home_prob: float, 
                 annual_growth=0.04,
                 years_to_complete=6,
                 home_prob=home_prob
-            ), 0.3)   # 30% MA
+            ), 0.2),   # 20% MA
+            (DegreeParams(
+                name='ASST_SHIFT',
+                initial_salary=31500,
+                salary_std=2800,
+                annual_growth=0.005,
+                years_to_complete=6,  # Longer time to complete (6 years)
+                home_prob=home_prob
+            ), 0.1)    # 10% ASST_SHIFT (students who begin pursuing bachelors but shift to assistant)
         ]
-    elif program_type == 'Nurse':
+    elif program_type == 'Nurse':  # Kenya program
         # For Nurse programs
+        # 33% of ASST should be moved to asst_shift
+        asst_percentage = 0.60
+        asst_shift_percentage = asst_percentage * 0.33
+        regular_asst_percentage = asst_percentage - asst_shift_percentage
+        
         return [
             (DegreeParams(
                 name='NURSE',
@@ -1121,7 +1135,15 @@ def get_degree_for_scenario(scenario: str, program_type: str, home_prob: float, 
                 annual_growth=0.005,
                 years_to_complete=3,
                 home_prob=home_prob
-            ), 0.60),  # 60% ASST
+            ), regular_asst_percentage),  # ~40% ASST
+            (DegreeParams(
+                name='ASST_SHIFT',
+                initial_salary=31500,  # Same salary as ASST
+                salary_std=2800,
+                annual_growth=0.005,
+                years_to_complete=6,  # Longer time to complete (6 years)
+                home_prob=home_prob
+            ), asst_shift_percentage),  # ~20% ASST_SHIFT
             (DegreeParams(
                 name='NA',
                 initial_salary=2200,
@@ -1131,8 +1153,13 @@ def get_degree_for_scenario(scenario: str, program_type: str, home_prob: float, 
                 home_prob=1.0  # Fixed high home probability for NA
             ), 0.15)   # 15% NA
         ]
-    elif program_type == 'Trade':
+    elif program_type == 'Trade':  # Rwanda program
         # For Trade programs
+        # 33% of ASST should be moved to asst_shift
+        asst_percentage = 0.40
+        asst_shift_percentage = asst_percentage * 0.33
+        regular_asst_percentage = asst_percentage - asst_shift_percentage
+        
         return [
             (DegreeParams(
                 name='TRADE',
@@ -1149,7 +1176,15 @@ def get_degree_for_scenario(scenario: str, program_type: str, home_prob: float, 
                 annual_growth=0.005,
                 years_to_complete=3,
                 home_prob=home_prob
-            ), 0.40),  # 40% ASST
+            ), regular_asst_percentage),  # ~27% ASST
+            (DegreeParams(
+                name='ASST_SHIFT',
+                initial_salary=31500,  # Same salary as ASST
+                salary_std=2800,
+                annual_growth=0.005,
+                years_to_complete=6,  # Longer time to complete (6 years)
+                home_prob=home_prob
+            ), asst_shift_percentage),  # ~13% ASST_SHIFT
             (DegreeParams(
                 name='NA',
                 initial_salary=2200,
@@ -1160,7 +1195,7 @@ def get_degree_for_scenario(scenario: str, program_type: str, home_prob: float, 
             ), 0.20)   # 20% NA
         ]
     else:
-        raise ValueError("Program type must be 'University', 'Nurse', or 'Trade'")
+        raise ValueError("Program type must be 'University' (Uganda), 'Nurse' (Kenya), or 'Trade' (Rwanda)")
 
 def aggregate_simulation_results(results: List[Dict]) -> Dict:
     """Aggregate results across multiple simulations"""
@@ -1233,7 +1268,7 @@ def main():
     
     parser = argparse.ArgumentParser(description='Run ISA impact simulations')
     parser.add_argument('--program', type=str, default='Nurse', choices=['University', 'Nurse', 'Trade'],
-                        help='Program type (University, Nurse, or Trade)')
+                        help='Program type (Uganda, Kenya, or Rwanda)')
     parser.add_argument('--scenario', type=str, default='baseline', 
                         choices=['baseline', 'conservative', 'optimistic', 'custom'],
                         help='Scenario to run')
@@ -1249,19 +1284,22 @@ def main():
     # Get price per student based on program type
     if args.program == 'University':
         price_per_student = 29000
+        program_display_name = 'Uganda'
     elif args.program == 'Nurse':
         price_per_student = 16650
+        program_display_name = 'Kenya'
     elif args.program == 'Trade':
         price_per_student = 15000
+        program_display_name = 'Rwanda'
     else:
-        raise ValueError("Program type must be 'University', 'Nurse', or 'Trade'")
+        raise ValueError("Program type must be 'University' (Uganda), 'Nurse' (Kenya), or 'Trade' (Rwanda)")
     
     # Calculate initial number of students that can be funded
     # Reserve 2% of investment for cash buffer
     available_for_students = args.investment * 0.98
     initial_students = int(available_for_students / price_per_student)
     
-    print(f"\nRunning {args.scenario} scenario for {args.program} program")
+    print(f"\nRunning {args.scenario} scenario for {program_display_name} program")
     print(f"Initial investment: ${args.investment:,.2f}")
     print(f"Price per student: ${price_per_student:,.2f}")
     print(f"Initial students that can be funded: {initial_students}")
