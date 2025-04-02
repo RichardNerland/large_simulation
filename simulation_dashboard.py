@@ -11,6 +11,9 @@ import base64
 import io
 from datetime import datetime
 from plotly.subplots import make_subplots
+import pickle
+from dash.exceptions import PreventUpdate
+import socket
 
 # Import simulation functions
 from impact_isa_model import (
@@ -40,545 +43,73 @@ impact_params = ImpactParams(
     moral_weight=1.44
 )
 
-# Create the Dash app
-app = dash.Dash(__name__, suppress_callback_exceptions=True)
-server = app.server  # Expose server variable for Gunicorn
+# Cache for precomputed percentile scenarios
+CACHE_DIR = "cache"
+cached_results = {}
+cached_yearly_data = {}
 
-# Main dashboard layout - unchanged
-dashboard_layout = html.Div([
-    # Header with navigation
-    html.Div([
-        html.Div([
-            html.H1("ISA Impact Simulation Dashboard", 
-                   style={'textAlign': 'center', 'margin': '0', 'padding': '20px 0', 'color': '#2c3e50'})
-        ], style={'width': '70%', 'display': 'inline-block'}),
-        html.Div([
-            html.Button('Back to Information', id='back-to-info', n_clicks=0,
-                      style={'backgroundColor': '#3498db', 'color': 'white', 'border': 'none',
-                             'padding': '10px 15px', 'borderRadius': '5px', 'cursor': 'pointer',
-                             'float': 'right', 'marginTop': '20px', 'marginRight': '20px'})
-        ], style={'width': '30%', 'display': 'inline-block', 'verticalAlign': 'top'})
-    ], style={'backgroundColor': '#f8f9fa', 'borderBottom': '1px solid #ddd', 'marginBottom': '20px', 
-              'boxShadow': '0 2px 5px rgba(0,0,0,0.1)', 'width': '100%'}),
-    
-    # Main content area with two columns
-    html.Div([
-        # Left panel for inputs
-        html.Div([
-            html.H2("Simulation Parameters", style={'textAlign': 'center', 'marginBottom': '20px', 'color': '#2c3e50'}),
-            
-            html.Div([
-                html.Label("Program Type:", style={'fontWeight': 'bold', 'marginBottom': '5px', 'display': 'block'}),
-                dcc.RadioItems(
-                    id='program-type',
-                    options=[
-                        {'label': 'Uganda', 'value': 'University'},
-                        {'label': 'Kenya', 'value': 'Nurse'},
-                        {'label': 'Rwanda', 'value': 'Trade'}
-                    ],
-                    value='Nurse',
-                    labelStyle={'display': 'inline-block', 'marginRight': '20px', 'fontSize': '16px'}
-                )
-            ], style={'marginBottom': '20px'}),
-            
-            html.Div([
-                html.Label("Initial Investment ($):", style={'fontWeight': 'bold', 'marginBottom': '5px', 'display': 'block'}),
-                html.Div("$1,000,000 (fixed)", style={'width': '100%', 'padding': '8px', 'borderRadius': '5px', 
-                                                     'border': '1px solid #ddd', 'backgroundColor': '#f5f5f5',
-                                                     'fontStyle': 'italic'})
-            ], style={'marginBottom': '20px'}),
-            
-            # Hidden input for initial investment with fixed value
-            dcc.Input(id='initial-investment', type='number', value=1000000, style={'display': 'none'}),
-            
-            # Toggle for choosing between percentile scenarios and custom weights
-            html.Div([
-                html.Label("Simulation Mode:", style={'fontWeight': 'bold', 'marginBottom': '5px', 'display': 'block'}),
-                dcc.RadioItems(
-                    id='simulation-mode',
-                    options=[
-                        {'label': 'Use 5 Percentile Scenarios (P10, P25, P50, P75, P90)', 'value': 'percentile'},
-                        {'label': 'Use Custom Degree Weights', 'value': 'custom'}
-                    ],
-                    value='percentile',
-                    labelStyle={'display': 'block', 'marginBottom': '5px', 'fontSize': '14px'}
-                )
-            ], style={'marginBottom': '15px', 'backgroundColor': '#f8f8f8', 'padding': '10px', 'borderRadius': '5px'}),
-            
-            # Custom weights section (only visible when custom mode is selected)
-            html.Div([
-                html.Label("Custom Degree Weights (%):", style={'fontWeight': 'bold', 'marginBottom': '5px', 'display': 'block'}),
-                
-                # Dynamic sliders for degree weights based on program type
-                html.Div(id='degree-weight-sliders', style={'marginTop': '10px'}),
-                
-                # Message for total weight
-                html.Div(id='total-weight-message', style={'marginTop': '10px', 'fontSize': '14px', 'fontWeight': 'bold'})
-            ], id='custom-weights-container', style={'marginBottom': '20px', 'backgroundColor': '#e3f2fd', 'padding': '15px', 'borderRadius': '5px'}),
-            
-            # Add a display for calculated initial students
-            html.Div(id='calculated-students', style={'marginBottom': '20px', 'padding': '10px', 
-                                                    'backgroundColor': '#f0f0f0', 'borderRadius': '5px'}),
-            
-            # Hidden inputs with default values
-            html.Div([
-                dcc.Input(id='home-prob', type='number', value=10, style={'display': 'none'}),
-                dcc.Input(id='unemployment-rate', type='number', value=8, style={'display': 'none'}),
-                dcc.Input(id='inflation-rate', type='number', value=2, style={'display': 'none'}),
-                # Add stores for degree weights
-                dcc.Store(id='stored-weights', data={})
-            ]),
-            
-            html.Button('Run Simulation', id='run-button', n_clicks=0, 
-                       style={'width': '100%', 'padding': '12px', 'backgroundColor': '#4CAF50', 'color': 'white',
-                              'border': 'none', 'borderRadius': '5px', 'cursor': 'pointer', 'fontSize': '16px',
-                              'fontWeight': 'bold', 'marginTop': '20px'})
-        ], style={'width': '30%', 'float': 'left', 'padding': '20px', 'backgroundColor': '#f9f9f9', 
-                  'borderRadius': '5px', 'boxShadow': '0 2px 5px rgba(0,0,0,0.1)'}),
+# Function to get cache filename for a scenario
+def get_cache_filename(program_type, percentile):
+    return f"{CACHE_DIR}/{program_type}_{percentile}_results.parquet"
+
+def get_yearly_data_filename(program_type, percentile):
+    return f"{CACHE_DIR}/{program_type}_{percentile}_yearly.parquet"
+
+# Function to load cached results
+def load_cached_results():
+    global cached_results, cached_yearly_data
+    try:
+        if not os.path.exists(CACHE_DIR):
+            os.makedirs(CACHE_DIR)
         
-        # Right panel for results
-        html.Div([
-            html.Div(id='simulation-results'),
-            
-            dcc.Tabs([
-                dcc.Tab(label='Percentile Tables', children=[
-                    html.Div([
-                        html.H4("Understanding the Tables"),
-                        html.P([
-                            "These tables show key metrics across different percentile scenarios, helping to understand the range of possible outcomes. ",
-                            "The tables are organized into four categories: degree distribution, financial metrics, student impact, and utility metrics."
-                        ]),
-                        html.P([
-                            "Financial metrics like IRR (Internal Rate of Return) and payment cap percentages help assess program sustainability. ",
-                            "Student impact metrics quantify the benefits to students, while utility metrics incorporate GiveWell's approach to measuring social impact."
-                        ])
-                    ], style={'padding': '10px', 'backgroundColor': '#f9f9f9', 'borderRadius': '5px', 'marginBottom': '15px'}),
-                    html.Div(id='percentile-tables', style={'padding': '20px'})
-                ]),
-                dcc.Tab(label='Impact Metrics (Utils)', children=[
-                    html.Div([
-                        html.H4("Understanding Impact Metrics in Utils"),
-                        html.P([
-                            "This graph shows the total utility (in utils) generated across different percentile scenarios. ",
-                            "It breaks down utility into student utility and remittance utility components, with the total utility (including additional effects) shown as points. ",
-                            "Utils are a measure of welfare benefit that incorporate GiveWell's approach to measuring social impact."
-                        ])
-                    ], style={'padding': '10px', 'backgroundColor': '#f9f9f9', 'borderRadius': '5px', 'marginBottom': '15px'}),
-                    dcc.Graph(id='impact-metrics-graph')
-                ]),
-                dcc.Tab(label='Impact Metrics (Dollars)', children=[
-                    html.Div([
-                        html.H4("Understanding Impact Metrics in Dollars"),
-                        html.P([
-                            "This graph shows the total earnings gain (in dollars) generated across different percentile scenarios. ",
-                            "It represents the direct financial impact of the program on students' lifetime earnings. ",
-                            "This metric helps assess the economic return on investment from the program."
-                        ])
-                    ], style={'padding': '10px', 'backgroundColor': '#f9f9f9', 'borderRadius': '5px', 'marginBottom': '15px'}),
-                    dcc.Graph(id='dollars-impact-graph')
-                ]),
-                dcc.Tab(label='Utility Breakdown', children=[
-                    html.Div([
-                        html.H4("Understanding Utility Breakdown"),
-                        html.P([
-                            "This graph breaks down the sources of utility (social welfare) generated by the program. ",
-                            "It incorporates GiveWell's approach to measuring impact, including moral weights for income effects and health benefits. ",
-                            "The breakdown helps understand which aspects of the program create the most social value."
-                        ])
-                    ], style={'padding': '10px', 'backgroundColor': '#f9f9f9', 'borderRadius': '5px', 'marginBottom': '15px'}),
-                    dcc.Graph(id='utility-breakdown-graph')
-                ]),
-                dcc.Tab(label='Relative Performance', children=[
-                    html.Div([
-                        html.H4("Understanding Relative Performance"),
-                        html.P([
-                            "This graph compares the performance of different percentile scenarios relative to each other. ",
-                            "It helps identify which scenarios meet GiveWell's cost-effectiveness threshold of 10x cash transfers, ",
-                            "and under what conditions the program becomes self-sustaining."
-                        ])
-                    ], style={'padding': '10px', 'backgroundColor': '#f9f9f9', 'borderRadius': '5px', 'marginBottom': '15px'}),
-                    dcc.Graph(id='relative-performance-graph')
-                ]),
-                dcc.Tab(label='Percentile Comparison', children=[
-                    html.Div([
-                        html.H4("Understanding Percentile Comparison"),
-                        html.P([
-                            "This graph compares key metrics across different percentile scenarios. ",
-                            "It helps visualize the range of possible outcomes and identify which factors are most sensitive to student success rates. ",
-                            "This is particularly important for assessing the robustness of the program under different assumptions."
-                        ])
-                    ], style={'padding': '10px', 'backgroundColor': '#f9f9f9', 'borderRadius': '5px', 'marginBottom': '15px'}),
-                    dcc.Graph(id='percentile-comparison-graph')
-                ]),
-                dcc.Tab(label='Yearly Cash Flow', children=[
-                    html.Div([
-                        html.H4("Understanding Yearly Cash Flow"),
-                        html.P([
-                            "This table shows the yearly cash flow of the program over the 55-year simulation period. ",
-                            "It helps assess when the program might become self-sustaining through ISA repayments, ",
-                            "which is a key consideration in GiveWell's assessment of Malengo's long-term impact."
-                        ])
-                    ], style={'padding': '10px', 'backgroundColor': '#f9f9f9', 'borderRadius': '5px', 'marginBottom': '15px'}),
-                    html.Div(id='yearly-cash-flow-table')
-                ])
-            ], style={'marginTop': '20px'})
-        ], style={'width': '65%', 'float': 'right', 'padding': '20px', 'backgroundColor': 'white', 
-                  'borderRadius': '5px', 'boxShadow': '0 2px 5px rgba(0,0,0,0.1)'})
-    ], style={'display': 'flex', 'flexWrap': 'wrap', 'margin': '0 20px'})
-])
+        # Initialize empty caches
+        cached_results = {}
+        cached_yearly_data = {}
+        
+        # Load all cached files
+        for program_type in ['University', 'Nurse', 'Trade']:
+            for percentile in ['p10', 'p25', 'p50', 'p75', 'p90']:
+                results_filename = get_cache_filename(program_type, percentile)
+                yearly_filename = get_yearly_data_filename(program_type, percentile)
+                
+                try:
+                    # Load simulation results
+                    if os.path.exists(results_filename):
+                        # Convert parquet to dictionary
+                        results_df = pd.read_parquet(results_filename)
+                        cached_results[f"{program_type}_{percentile}"] = results_df.to_dict('records')[0]
+                        print(f"Loaded cached results for {program_type} {percentile}")
+                    
+                    # Load yearly data
+                    if os.path.exists(yearly_filename):
+                        cached_yearly_data[f"{program_type}_{percentile}"] = pd.read_parquet(yearly_filename).to_dict('records')
+                        print(f"Loaded cached yearly data for {program_type} {percentile}")
+                except Exception as e:
+                    print(f"Error loading cache for {program_type} {percentile}: {e}")
+    except Exception as e:
+        print(f"Error initializing cache: {e}")
 
-# Get the landing page layout from the imported function
-landing_page = create_landing_page()
-
-# Define the app layout with both layouts included but only one visible at a time
-app.layout = html.Div([
-    # Store the current page
-    dcc.Location(id='url', refresh=False),
-    
-    # Landing page div (initially visible)
-    html.Div(id='landing-page-container', children=landing_page),
-    
-    # Dashboard div (initially hidden)
-    html.Div(id='dashboard-container', children=dashboard_layout, style={'display': 'none'})
-])
-
-# Callback to toggle visibility of pages based on URL
-@app.callback(
-    [Output('landing-page-container', 'style'),
-     Output('dashboard-container', 'style')],
-    [Input('url', 'pathname')]
-)
-def display_page(pathname):
-    if pathname == '/dashboard':
-        # Show dashboard, hide landing page
-        return {'display': 'none'}, {'display': 'block'}
-    else:
-        # Show landing page, hide dashboard
-        return {'display': 'block'}, {'display': 'none'}
-
-# Callback for button navigation
-@app.callback(
-    Output('url', 'pathname'),
-    [Input('go-to-dashboard', 'n_clicks'),
-     Input('back-to-info', 'n_clicks')],
-    prevent_initial_call=True
-)
-def navigate(go_to_dashboard, back_to_info):
-    ctx = callback_context
-    if not ctx.triggered:
-        return dash.no_update
-    
-    button_id = ctx.triggered[0]['prop_id'].split('.')[0]
-    
-    if button_id == 'go-to-dashboard':
-        return '/dashboard'
-    elif button_id == 'back-to-info':
-        return '/'
-    
-    return dash.no_update
-
-# Callback to generate degree weight sliders based on program type
-@app.callback(
-    Output('degree-weight-sliders', 'children'),
-    [Input('program-type', 'value')]
-)
-def update_degree_sliders(program_type):
-    # Create different sliders based on program type
-    if program_type == 'University':
-        # Uganda program - sliders for BA, MA, ASST_SHIFT, NA
-        sliders = [
-            html.Div([
-                html.Label(f"Bachelor's Degree (BA):", style={'marginBottom': '5px', 'display': 'block'}),
-                dcc.Slider(
-                    id='ba-weight',
-                    min=0,
-                    max=100,
-                    step=1,
-                    value=45,  # Default from p50
-                    marks={i: f'{i}%' for i in range(0, 101, 25)},
-                    tooltip={'placement': 'bottom', 'always_visible': True},
-                )
-            ], style={'marginBottom': '15px'}),
-            
-            html.Div([
-                html.Label(f"Master's Degree (MA):", style={'marginBottom': '5px', 'display': 'block'}),
-                dcc.Slider(
-                    id='ma-weight',
-                    min=0,
-                    max=100,
-                    step=1,
-                    value=24,  # Default from p50
-                    marks={i: f'{i}%' for i in range(0, 101, 25)},
-                    tooltip={'placement': 'bottom', 'always_visible': True},
-                )
-            ], style={'marginBottom': '15px'}),
-            
-            html.Div([
-                html.Label(f"Assistant Shift (ASST_SHIFT):", style={'marginBottom': '5px', 'display': 'block'}),
-                dcc.Slider(
-                    id='asst-shift-weight-uni',
-                    min=0,
-                    max=100,
-                    step=1,
-                    value=27,  # Default from p50
-                    marks={i: f'{i}%' for i in range(0, 101, 25)},
-                    tooltip={'placement': 'bottom', 'always_visible': True},
-                )
-            ], style={'marginBottom': '15px'}),
-            
-            html.Div([
-                html.Label(f"No Completion (NA):", style={'marginBottom': '5px', 'display': 'block'}),
-                dcc.Slider(
-                    id='na-weight-uni',
-                    min=0,
-                    max=100,
-                    step=1,
-                    value=4,  # Default from p50
-                    marks={i: f'{i}%' for i in range(0, 101, 25)},
-                    tooltip={'placement': 'bottom', 'always_visible': True},
-                )
-            ], style={'marginBottom': '5px'})
-        ]
-    
-    elif program_type == 'Nurse':
-        # Kenya program - sliders for NURSE, ASST, ASST_SHIFT, NA
-        sliders = [
-            html.Div([
-                html.Label(f"Nursing Degree (NURSE):", style={'marginBottom': '5px', 'display': 'block'}),
-                dcc.Slider(
-                    id='nurse-weight',
-                    min=0,
-                    max=100,
-                    step=1,
-                    value=30,  # Default from p50
-                    marks={i: f'{i}%' for i in range(0, 101, 25)},
-                    tooltip={'placement': 'bottom', 'always_visible': True},
-                )
-            ], style={'marginBottom': '15px'}),
-            
-            html.Div([
-                html.Label(f"Assistant (ASST):", style={'marginBottom': '5px', 'display': 'block'}),
-                dcc.Slider(
-                    id='asst-weight-nurse',
-                    min=0,
-                    max=100,
-                    step=1,
-                    value=40,  # Default from p50
-                    marks={i: f'{i}%' for i in range(0, 101, 25)},
-                    tooltip={'placement': 'bottom', 'always_visible': True},
-                )
-            ], style={'marginBottom': '15px'}),
-            
-            html.Div([
-                html.Label(f"Assistant Shift (ASST_SHIFT):", style={'marginBottom': '5px', 'display': 'block'}),
-                dcc.Slider(
-                    id='asst-shift-weight-nurse',
-                    min=0,
-                    max=100,
-                    step=1,
-                    value=20,  # Default from p50
-                    marks={i: f'{i}%' for i in range(0, 101, 25)},
-                    tooltip={'placement': 'bottom', 'always_visible': True},
-                )
-            ], style={'marginBottom': '15px'}),
-            
-            html.Div([
-                html.Label(f"No Completion (NA):", style={'marginBottom': '5px', 'display': 'block'}),
-                dcc.Slider(
-                    id='na-weight-nurse',
-                    min=0,
-                    max=100,
-                    step=1,
-                    value=10,  # Default from p50
-                    marks={i: f'{i}%' for i in range(0, 101, 25)},
-                    tooltip={'placement': 'bottom', 'always_visible': True},
-                )
-            ], style={'marginBottom': '5px'})
-        ]
-    
-    else:  # Trade program
-        # Rwanda program - sliders for TRADE, ASST, ASST_SHIFT, NA
-        sliders = [
-            html.Div([
-                html.Label(f"Trade Program (TRADE):", style={'marginBottom': '5px', 'display': 'block'}),
-                dcc.Slider(
-                    id='trade-weight',
-                    min=0,
-                    max=100,
-                    step=1,
-                    value=40,  # Default from p50
-                    marks={i: f'{i}%' for i in range(0, 101, 25)},
-                    tooltip={'placement': 'bottom', 'always_visible': True},
-                )
-            ], style={'marginBottom': '15px'}),
-            
-            html.Div([
-                html.Label(f"Assistant (ASST):", style={'marginBottom': '5px', 'display': 'block'}),
-                dcc.Slider(
-                    id='asst-weight-trade',
-                    min=0,
-                    max=100,
-                    step=1,
-                    value=30,  # Default from p50
-                    marks={i: f'{i}%' for i in range(0, 101, 25)},
-                    tooltip={'placement': 'bottom', 'always_visible': True},
-                )
-            ], style={'marginBottom': '15px'}),
-            
-            html.Div([
-                html.Label(f"Assistant Shift (ASST_SHIFT):", style={'marginBottom': '5px', 'display': 'block'}),
-                dcc.Slider(
-                    id='asst-shift-weight-trade',
-                    min=0,
-                    max=100,
-                    step=1,
-                    value=15,  # Default from p50
-                    marks={i: f'{i}%' for i in range(0, 101, 25)},
-                    tooltip={'placement': 'bottom', 'always_visible': True},
-                )
-            ], style={'marginBottom': '15px'}),
-            
-            html.Div([
-                html.Label(f"No Completion (NA):", style={'marginBottom': '5px', 'display': 'block'}),
-                dcc.Slider(
-                    id='na-weight-trade',
-                    min=0,
-                    max=100,
-                    step=1,
-                    value=15,  # Default from p50
-                    marks={i: f'{i}%' for i in range(0, 101, 25)},
-                    tooltip={'placement': 'bottom', 'always_visible': True},
-                )
-            ], style={'marginBottom': '5px'})
-        ]
-    
-    return sliders
-
-# Add a callback to update the calculated students display
-@app.callback(
-    Output('calculated-students', 'children'),
-    [Input('program-type', 'value')]
-)
-def update_calculated_students(program_type):
-    # Fixed initial investment
-    initial_investment = 1000000
-    
-    # Get price per student based on program type
-    if program_type == 'University':
-        price_per_student = 29000
-        program_name = 'Uganda'
-    elif program_type == 'Nurse':
-        price_per_student = 16650
-        program_name = 'Kenya'
-    elif program_type == 'Trade':
-        price_per_student = 16650
-        program_name = 'Rwanda'
-    else:
-        return "Invalid program type"
-    
-    # Calculate number of students (reserving 2% for cash buffer)
-    available_for_students = initial_investment * 0.98
-    initial_students = int(available_for_students / price_per_student)
-    
-    return html.Div([
-        html.P(f"{program_name} Program - Price per student: ${price_per_student:,.2f}", style={'marginBottom': '5px'}),
-        html.P([
-            f"Initial investment: ${initial_investment:,} (fixed)",
-            html.Br(),
-            f"Initial students that can be funded: {initial_students}"
-        ], style={'fontWeight': 'bold'})
-    ])
-
-# Add callbacks to update stored weights
-@app.callback(
-    Output('stored-weights', 'data', allow_duplicate=True),
-    [Input('program-type', 'value'),
-     Input('degree-weight-sliders', 'children')],
-    [State('stored-weights', 'data')],
-    prevent_initial_call='initial_duplicate'
-)
-def update_stored_weights(program_type, sliders, current_data):
-    # Initialize or update stored weights
-    stored_data = current_data or {}
-    
-    # Set default values based on program type
-    if program_type == 'University':
-        stored_data.update({
-            'ba-weight': 45,
-            'ma-weight': 24,
-            'asst-shift-weight-uni': 27,
-            'na-weight-uni': 4
-        })
-    elif program_type == 'Nurse':
-        stored_data.update({
-            'nurse-weight': 30,
-            'asst-weight-nurse': 40,
-            'asst-shift-weight-nurse': 20,
-            'na-weight-nurse': 10
-        })
-    else:  # Trade
-        stored_data.update({
-            'trade-weight': 40,
-            'asst-weight-trade': 30,
-            'asst-shift-weight-trade': 15,
-            'na-weight-trade': 15
-        })
-    
-    return stored_data
-
-# Add callback to update totals when sliders change
-@app.callback(
-    Output('total-weight-message', 'children'),
-    Output('total-weight-message', 'style'),
-    [Input('stored-weights', 'data'),
-     Input('program-type', 'value')]
-)
-def update_total_message(stored_weights, program_type):
-    if not stored_weights:
-        return "Total: 100% ✓", {'color': 'green', 'marginTop': '10px', 'fontSize': '14px', 'fontWeight': 'bold'}
-    
-    # Calculate total based on program type
-    total = 0
-    if program_type == 'University':
-        weights = [
-            stored_weights.get('ba-weight', 45),
-            stored_weights.get('ma-weight', 24),
-            stored_weights.get('asst-shift-weight-uni', 27),
-            stored_weights.get('na-weight-uni', 4)
-        ]
-        total = sum(weights)
-    elif program_type == 'Nurse':
-        weights = [
-            stored_weights.get('nurse-weight', 30),
-            stored_weights.get('asst-weight-nurse', 40),
-            stored_weights.get('asst-shift-weight-nurse', 20),
-            stored_weights.get('na-weight-nurse', 10)
-        ]
-        total = sum(weights)
-    else:  # Trade
-        weights = [
-            stored_weights.get('trade-weight', 40),
-            stored_weights.get('asst-weight-trade', 30),
-            stored_weights.get('asst-shift-weight-trade', 15),
-            stored_weights.get('na-weight-trade', 15)
-        ]
-        total = sum(weights)
-    
-    if total == 100:
-        return f"Total: {total}% ✓", {'color': 'green', 'marginTop': '10px', 'fontSize': '14px', 'fontWeight': 'bold'}
-    else:
-        return f"Total: {total}% (must equal 100%)", {'color': 'red', 'marginTop': '10px', 'fontSize': '14px', 'fontWeight': 'bold'}
-
-# Add a callback to show/hide the custom weights container
-@app.callback(
-    Output('custom-weights-container', 'style'),
-    [Input('simulation-mode', 'value')]
-)
-def toggle_custom_weights(mode):
-    if mode == 'custom':
-        return {'marginBottom': '20px', 'backgroundColor': '#e3f2fd', 'padding': '15px', 'borderRadius': '5px', 'display': 'block'}
-    else:
-        return {'display': 'none'}
+# Function to save results to cache
+def save_to_cache(program_type, percentile, results, yearly_data):
+    try:
+        if not os.path.exists(CACHE_DIR):
+            os.makedirs(CACHE_DIR)
+        
+        results_filename = get_cache_filename(program_type, percentile)
+        yearly_filename = get_yearly_data_filename(program_type, percentile)
+        
+        # Save simulation results (convert to DataFrame first)
+        results_df = pd.DataFrame([results])
+        results_df.to_parquet(results_filename, index=False)
+        cached_results[f"{program_type}_{percentile}"] = results
+        
+        # Save yearly data (already in list of dicts format)
+        pd.DataFrame(yearly_data).to_parquet(yearly_filename, index=False)
+        cached_yearly_data[f"{program_type}_{percentile}"] = yearly_data
+        
+        print(f"Saved results and yearly data to cache for {program_type} {percentile}")
+    except Exception as e:
+        print(f"Error saving cache for {program_type} {percentile}: {e}")
 
 # Define function to create degree parameters based on percentile
 def create_degree_params(percentile, program_type):
@@ -1125,6 +656,76 @@ def create_degree_params(percentile, program_type):
     
     return None  # Should never reach here
 
+# Function to precompute all percentile scenarios 
+def precompute_percentile_scenarios():
+    """Precompute and cache all percentile scenarios if cache is empty"""
+    print("Checking if precomputation is needed...")
+    
+    # Check if we have all percentile scenarios cached
+    all_cached = True
+    for program_type in ['University', 'Nurse', 'Trade']:
+        for percentile in ['p10', 'p25', 'p50', 'p75', 'p90']:
+            cache_key = f"{program_type}_{percentile}"
+            if cache_key not in cached_results:
+                all_cached = False
+                break
+        if not all_cached:
+            break
+    
+    if all_cached:
+        print("All percentile scenarios already cached. No precomputation needed.")
+        return
+    
+    print("Some percentile scenarios not cached. Starting precomputation...")
+    for program_type in ['University', 'Nurse', 'Trade']:
+        print(f"Precomputing {program_type} scenarios...")
+        for percentile in ['p10', 'p25', 'p50', 'p75', 'p90']:
+            cache_key = f"{program_type}_{percentile}"
+            
+            # Skip if already cached
+            if cache_key in cached_results:
+                print(f"  - {percentile} already cached, skipping")
+                continue
+                
+            print(f"  - Computing {percentile}...")
+            
+            # Create a callback to collect yearly data
+            yearly_data = []
+            
+            def data_callback(year, cash, total_contracts, active_contracts, returns, exits):
+                yearly_data.append({
+                    'year': year,
+                    'cash': cash,
+                    'total_contracts': total_contracts,
+                    'active_contracts': active_contracts,
+                    'returns': returns,
+                    'exits': exits
+                })
+            
+            # Get degree params for this percentile
+            degree_params = create_degree_params(percentile, program_type)
+            
+            # Run simulation with fixed parameters
+            results = simulate_impact(
+                program_type=program_type,
+                initial_investment=1000000,  # Fixed at $1M
+                num_years=45,
+                impact_params=impact_params,
+                num_sims=1,
+                scenario='baseline',
+                remittance_rate=0.1,
+                home_prob=0.1,  # Fixed at 10%
+                degree_params=degree_params,
+                initial_unemployment_rate=0.08,  # Fixed at 8%
+                initial_inflation_rate=0.02,  # Fixed at 2%
+                data_callback=data_callback
+            )
+            
+            # Cache the results
+            save_to_cache(program_type, percentile, results, yearly_data)
+            
+    print("Precomputation complete!")
+
 # Save percentile results to CSV for visualization
 def save_percentile_results_to_csv(all_results, percentiles):
     """Save percentile simulation results to CSV for visualization."""
@@ -1148,8 +749,8 @@ def save_percentile_results_to_csv(all_results, percentiles):
 
 # Create a custom implementation of degree params based on user sliders
 def create_custom_degree_params(program_type, ba_weight=None, ma_weight=None, asst_shift_weight_uni=None, na_weight_uni=None,
-                              nurse_weight=None, asst_weight_nurse=None, asst_shift_weight_nurse=None, na_weight_nurse=None,
-                              trade_weight=None, asst_weight_trade=None, asst_shift_weight_trade=None, na_weight_trade=None):
+                               nurse_weight=None, asst_weight_nurse=None, asst_shift_weight_nurse=None, na_weight_nurse=None,
+                               trade_weight=None, asst_weight_trade=None, asst_shift_weight_trade=None, na_weight_trade=None):
     """Create degree parameters based on custom user-defined weights."""
     
     # Convert percentage inputs to decimals
@@ -1279,6 +880,562 @@ def create_custom_degree_params(program_type, ba_weight=None, ma_weight=None, as
             ), na_pct)
         ]
 
+# Load cached results at startup
+load_cached_results()
+
+# Precompute all percentile scenarios if needed
+if os.environ.get('SKIP_PRECOMPUTATION', '').lower() != 'true':
+    precompute_percentile_scenarios()
+else:
+    print("Skipping precomputation due to SKIP_PRECOMPUTATION environment variable")
+
+# Create the Dash app
+app = dash.Dash(__name__, suppress_callback_exceptions=True)
+server = app.server  # Expose server variable for Gunicorn
+
+# Main dashboard layout - unchanged
+dashboard_layout = html.Div([
+    # Header with navigation
+    html.Div([
+        html.Div([
+            html.H1("ISA Impact Simulation Dashboard", 
+                   style={'textAlign': 'center', 'margin': '0', 'padding': '20px 0', 'color': '#2c3e50'})
+        ], style={'width': '70%', 'display': 'inline-block'}),
+        html.Div([
+            html.Button('Back to Information', id='back-to-info', n_clicks=0,
+                      style={'backgroundColor': '#3498db', 'color': 'white', 'border': 'none',
+                             'padding': '10px 15px', 'borderRadius': '5px', 'cursor': 'pointer',
+                             'float': 'right', 'marginTop': '20px', 'marginRight': '20px'})
+        ], style={'width': '30%', 'display': 'inline-block', 'verticalAlign': 'top'})
+    ], style={'backgroundColor': '#f8f9fa', 'borderBottom': '1px solid #ddd', 'marginBottom': '20px', 
+              'boxShadow': '0 2px 5px rgba(0,0,0,0.1)', 'width': '100%'}),
+    
+    # Main content area with two columns
+    html.Div([
+        # Left panel for inputs
+        html.Div([
+            html.H2("Simulation Parameters", style={'textAlign': 'center', 'marginBottom': '20px', 'color': '#2c3e50'}),
+            
+            html.Div([
+                html.Label("Program Type:", style={'fontWeight': 'bold', 'marginBottom': '5px', 'display': 'block'}),
+                dcc.RadioItems(
+                    id='program-type',
+                    options=[
+                        {'label': 'Uganda', 'value': 'University'},
+                        {'label': 'Kenya', 'value': 'Nurse'},
+                        {'label': 'Rwanda', 'value': 'Trade'}
+                    ],
+                    value='Nurse',
+                    labelStyle={'display': 'inline-block', 'marginRight': '20px', 'fontSize': '16px'}
+                )
+            ], style={'marginBottom': '20px'}),
+            
+            html.Div([
+                html.Label("Initial Investment ($):", style={'fontWeight': 'bold', 'marginBottom': '5px', 'display': 'block'}),
+                html.Div("$1,000,000 (fixed)", style={'width': '100%', 'padding': '8px', 'borderRadius': '5px', 
+                                                     'border': '1px solid #ddd', 'backgroundColor': '#f5f5f5',
+                                                     'fontStyle': 'italic'})
+            ], style={'marginBottom': '20px'}),
+            
+            # Hidden input for initial investment with fixed value
+            dcc.Input(id='initial-investment', type='number', value=1000000, style={'display': 'none'}),
+            
+            # Toggle for choosing between percentile scenarios and custom weights
+            html.Div([
+                html.Label("Simulation Mode:", style={'fontWeight': 'bold', 'marginBottom': '5px', 'display': 'block'}),
+                dcc.RadioItems(
+                    id='simulation-mode',
+                    options=[
+                        {'label': 'Use 5 Percentile Scenarios (P10, P25, P50, P75, P90)', 'value': 'percentile'},
+                        {'label': 'Use Custom Degree Weights', 'value': 'custom'}
+                    ],
+                    value='percentile',
+                    labelStyle={'display': 'block', 'marginBottom': '5px', 'fontSize': '14px'}
+                )
+            ], style={'marginBottom': '15px', 'backgroundColor': '#f8f8f8', 'padding': '10px', 'borderRadius': '5px'}),
+            
+            # Custom weights section (only visible when custom mode is selected)
+            html.Div([
+                html.Label("Custom Degree Weights (%):", style={'fontWeight': 'bold', 'marginBottom': '5px', 'display': 'block'}),
+                
+                # Dynamic sliders for degree weights based on program type
+                html.Div(id='degree-weight-sliders', style={'marginTop': '10px'}),
+                
+                # Message for total weight
+                html.Div(id='total-weight-message', style={'marginTop': '10px', 'fontSize': '14px', 'fontWeight': 'bold'})
+            ], id='custom-weights-container', style={'marginBottom': '20px', 'backgroundColor': '#e3f2fd', 'padding': '15px', 'borderRadius': '5px'}),
+            
+            # Add a display for calculated initial students
+            html.Div(id='calculated-students', style={'marginBottom': '20px', 'padding': '10px', 
+                                                    'backgroundColor': '#f0f0f0', 'borderRadius': '5px'}),
+            
+            # Hidden inputs with default values
+            html.Div([
+                dcc.Input(id='home-prob', type='number', value=10, style={'display': 'none'}),
+                dcc.Input(id='unemployment-rate', type='number', value=8, style={'display': 'none'}),
+                dcc.Input(id='inflation-rate', type='number', value=2, style={'display': 'none'}),
+                # Add stores for degree weights
+                dcc.Store(id='stored-weights', data={})
+            ]),
+            
+            html.Button('Run Simulation', id='run-button', n_clicks=0, 
+                       style={'width': '100%', 'padding': '12px', 'backgroundColor': '#4CAF50', 'color': 'white',
+                              'border': 'none', 'borderRadius': '5px', 'cursor': 'pointer', 'fontSize': '16px',
+                              'fontWeight': 'bold', 'marginTop': '20px'})
+        ], style={'width': '30%', 'float': 'left', 'padding': '20px', 'backgroundColor': '#f9f9f9', 
+                  'borderRadius': '5px', 'boxShadow': '0 2px 5px rgba(0,0,0,0.1)'}),
+        
+        # Right panel for results
+        html.Div([
+            # Add loading spinner that wraps all content
+            dcc.Loading(
+                id="loading-simulation",
+                type="circle",
+                children=[
+                    html.Div(id='simulation-results'),
+                    html.Div(id='tabs-container', children=[
+                        dcc.Tabs(style={'marginTop': '20px'}, children=[
+                            dcc.Tab(label='Percentile Tables', children=[
+                                html.Div([
+                                    html.H4("Understanding the Tables"),
+                                    html.P([
+                                        "These tables show key metrics across different percentile scenarios, helping to understand the range of possible outcomes. ",
+                                        "The tables are organized into four categories: degree distribution, financial metrics, student impact, and utility metrics."
+                                    ]),
+                                    html.P([
+                                        "Financial metrics like IRR (Internal Rate of Return) and payment cap percentages help assess program sustainability. ",
+                                        "Student impact metrics quantify the benefits to students, while utility metrics incorporate GiveWell's approach to measuring social impact."
+                                    ])
+                                ], style={'padding': '10px', 'backgroundColor': '#f9f9f9', 'borderRadius': '5px', 'marginBottom': '15px'}),
+                                html.Div(id='percentile-tables', style={'padding': '20px'})
+                            ]),
+                            dcc.Tab(label='Impact Metrics (Utils)', children=[
+                                html.Div([
+                                    html.H4("Understanding Impact Metrics in Utils"),
+                                    html.P([
+                                        "This graph shows the total utility (in utils) generated across different percentile scenarios. ",
+                                        "It breaks down utility into student utility and remittance utility components, with the total utility (including additional effects) shown as points. ",
+                                        "Utils are a measure of welfare benefit that incorporate GiveWell's approach to measuring social impact."
+                                    ])
+                                ], style={'padding': '10px', 'backgroundColor': '#f9f9f9', 'borderRadius': '5px', 'marginBottom': '15px'}),
+                                dcc.Graph(id='impact-metrics-graph')
+                            ]),
+                            dcc.Tab(label='Impact Metrics (Dollars)', children=[
+                                html.Div([
+                                    html.H4("Understanding Impact Metrics in Dollars"),
+                                    html.P([
+                                        "This graph shows the total earnings gain (in dollars) generated across different percentile scenarios. ",
+                                        "It represents the direct financial impact of the program on students' lifetime earnings. ",
+                                        "This metric helps assess the economic return on investment from the program."
+                                    ])
+                                ], style={'padding': '10px', 'backgroundColor': '#f9f9f9', 'borderRadius': '5px', 'marginBottom': '15px'}),
+                                dcc.Graph(id='dollars-impact-graph')
+                            ]),
+                            dcc.Tab(label='Utility Breakdown', children=[
+                                html.Div([
+                                    html.H4("Understanding Utility Breakdown"),
+                                    html.P([
+                                        "This graph breaks down the sources of utility (social welfare) generated by the program. ",
+                                        "It incorporates GiveWell's approach to measuring impact, including moral weights for income effects and health benefits. ",
+                                        "The breakdown helps understand which aspects of the program create the most social value."
+                                    ])
+                                ], style={'padding': '10px', 'backgroundColor': '#f9f9f9', 'borderRadius': '5px', 'marginBottom': '15px'}),
+                                dcc.Graph(id='utility-breakdown-graph')
+                            ]),
+                            dcc.Tab(label='Relative Performance', children=[
+                                html.Div([
+                                    html.H4("Understanding Relative Performance"),
+                                    html.P([
+                                        "This graph compares the performance of different percentile scenarios relative to each other. ",
+                                        "It helps identify which scenarios meet GiveWell's cost-effectiveness threshold of 10x cash transfers, ",
+                                        "and under what conditions the program becomes self-sustaining."
+                                    ])
+                                ], style={'padding': '10px', 'backgroundColor': '#f9f9f9', 'borderRadius': '5px', 'marginBottom': '15px'}),
+                                dcc.Graph(id='relative-performance-graph')
+                            ]),
+                            dcc.Tab(label='Percentile Comparison', children=[
+                                html.Div([
+                                    html.H4("Understanding Percentile Comparison"),
+                                    html.P([
+                                        "This graph compares key metrics across different percentile scenarios. ",
+                                        "It helps visualize the range of possible outcomes and identify which factors are most sensitive to student success rates. ",
+                                        "This is particularly important for assessing the robustness of the program under different assumptions."
+                                    ])
+                                ], style={'padding': '10px', 'backgroundColor': '#f9f9f9', 'borderRadius': '5px', 'marginBottom': '15px'}),
+                                dcc.Graph(id='percentile-comparison-graph')
+                            ]),
+                            dcc.Tab(label='Yearly Cash Flow', children=[
+                                html.Div([
+                                    html.H4("Understanding Yearly Cash Flow"),
+                                    html.P([
+                                        "This table shows the yearly cash flow of the program over the 55-year simulation period. ",
+                                        "It helps assess when the program might become self-sustaining through ISA repayments, ",
+                                        "which is a key consideration in GiveWell's assessment of Malengo's long-term impact."
+                                    ])
+                                ], style={'padding': '10px', 'backgroundColor': '#f9f9f9', 'borderRadius': '5px', 'marginBottom': '15px'}),
+                                html.Div(id='yearly-cash-flow-table')
+                            ])
+                        ])
+                    ])
+                ])
+        ], style={'width': '65%', 'float': 'right', 'padding': '20px', 'backgroundColor': 'white', 
+                  'borderRadius': '5px', 'boxShadow': '0 2px 5px rgba(0,0,0,0.1)'})
+    ], style={'display': 'flex', 'flexWrap': 'wrap', 'margin': '0 20px'})
+])
+
+# Get the landing page layout from the imported function
+landing_page = create_landing_page()
+
+# Define the app layout with both layouts included but only one visible at a time
+app.layout = html.Div([
+    # Store the current page
+    dcc.Location(id='url', refresh=False),
+    
+    # Landing page div (initially visible)
+    html.Div(id='landing-page-container', children=landing_page),
+    
+    # Dashboard div (initially hidden)
+    html.Div(id='dashboard-container', children=dashboard_layout, style={'display': 'none'})
+])
+
+# Callback to toggle visibility of pages based on URL
+@app.callback(
+    [Output('landing-page-container', 'style'),
+     Output('dashboard-container', 'style')],
+    [Input('url', 'pathname')]
+)
+def display_page(pathname):
+    if pathname == '/dashboard':
+        # Show dashboard, hide landing page
+        return {'display': 'none'}, {'display': 'block'}
+    else:
+        # Show landing page, hide dashboard
+        return {'display': 'block'}, {'display': 'none'}
+
+# Callback for button navigation
+@app.callback(
+    Output('url', 'pathname'),
+    [Input('go-to-dashboard', 'n_clicks'),
+     Input('back-to-info', 'n_clicks')],
+    prevent_initial_call=True
+)
+def navigate(go_to_dashboard, back_to_info):
+    ctx = callback_context
+    if not ctx.triggered:
+        return dash.no_update
+    
+    button_id = ctx.triggered[0]['prop_id'].split('.')[0]
+    
+    if button_id == 'go-to-dashboard':
+        return '/dashboard'
+    elif button_id == 'back-to-info':
+        return '/'
+    
+    return dash.no_update
+
+# Callback to generate degree weight sliders based on program type
+@app.callback(
+    Output('degree-weight-sliders', 'children'),
+    [Input('program-type', 'value')]
+)
+def update_degree_sliders(program_type):
+    # Create different sliders based on program type
+    if program_type == 'University':
+        # Uganda program - sliders for BA, MA, ASST_SHIFT, NA
+        sliders = [
+            html.Div([
+                html.Label(f"Bachelor's Degree (BA):", style={'marginBottom': '5px', 'display': 'block'}),
+                dcc.Slider(
+                    id='ba-weight',
+                    min=0,
+                    max=100,
+                    step=1,
+                    value=45,  # Default from p50
+                    marks={i: f'{i}%' for i in range(0, 101, 25)},
+                    tooltip={'placement': 'bottom', 'always_visible': True},
+                )
+            ], style={'marginBottom': '15px'}),
+            
+            html.Div([
+                html.Label(f"Master's Degree (MA):", style={'marginBottom': '5px', 'display': 'block'}),
+                dcc.Slider(
+                    id='ma-weight',
+                    min=0,
+                    max=100,
+                    step=1,
+                    value=24,  # Default from p50
+                    marks={i: f'{i}%' for i in range(0, 101, 25)},
+                    tooltip={'placement': 'bottom', 'always_visible': True},
+                )
+            ], style={'marginBottom': '15px'}),
+            
+            html.Div([
+                html.Label(f"Assistant Shift (ASST_SHIFT):", style={'marginBottom': '5px', 'display': 'block'}),
+                dcc.Slider(
+                    id='asst-shift-weight-uni',
+                    min=0,
+                    max=100,
+                    step=1,
+                    value=27,  # Default from p50
+                    marks={i: f'{i}%' for i in range(0, 101, 25)},
+                    tooltip={'placement': 'bottom', 'always_visible': True},
+                )
+            ], style={'marginBottom': '15px'}),
+            
+            html.Div([
+                html.Label(f"No Completion (NA):", style={'marginBottom': '5px', 'display': 'block'}),
+                dcc.Slider(
+                    id='na-weight-uni',
+                    min=0,
+                    max=100,
+                    step=1,
+                    value=4,  # Default from p50
+                    marks={i: f'{i}%' for i in range(0, 101, 25)},
+                    tooltip={'placement': 'bottom', 'always_visible': True},
+                )
+            ], style={'marginBottom': '5px'})
+        ]
+    
+    elif program_type == 'Nurse':
+        # Kenya program - sliders for NURSE, ASST, ASST_SHIFT, NA
+        sliders = [
+            html.Div([
+                html.Label(f"Nursing Degree (NURSE):", style={'marginBottom': '5px', 'display': 'block'}),
+                dcc.Slider(
+                    id='nurse-weight',
+                    min=0,
+                    max=100,
+                    step=1,
+                    value=30,  # Default from p50
+                    marks={i: f'{i}%' for i in range(0, 101, 25)},
+                    tooltip={'placement': 'bottom', 'always_visible': True},
+                )
+            ], style={'marginBottom': '15px'}),
+            
+            html.Div([
+                html.Label(f"Assistant (ASST):", style={'marginBottom': '5px', 'display': 'block'}),
+                dcc.Slider(
+                    id='asst-weight-nurse',
+                    min=0,
+                    max=100,
+                    step=1,
+                    value=40,  # Default from p50
+                    marks={i: f'{i}%' for i in range(0, 101, 25)},
+                    tooltip={'placement': 'bottom', 'always_visible': True},
+                )
+            ], style={'marginBottom': '15px'}),
+            
+            html.Div([
+                html.Label(f"Assistant Shift (ASST_SHIFT):", style={'marginBottom': '5px', 'display': 'block'}),
+                dcc.Slider(
+                    id='asst-shift-weight-nurse',
+                    min=0,
+                    max=100,
+                    step=1,
+                    value=20,  # Default from p50
+                    marks={i: f'{i}%' for i in range(0, 101, 25)},
+                    tooltip={'placement': 'bottom', 'always_visible': True},
+                )
+            ], style={'marginBottom': '15px'}),
+            
+            html.Div([
+                html.Label(f"No Completion (NA):", style={'marginBottom': '5px', 'display': 'block'}),
+                dcc.Slider(
+                    id='na-weight-nurse',
+                    min=0,
+                    max=100,
+                    step=1,
+                    value=10,  # Default from p50
+                    marks={i: f'{i}%' for i in range(0, 101, 25)},
+                    tooltip={'placement': 'bottom', 'always_visible': True},
+                )
+            ], style={'marginBottom': '5px'})
+        ]
+    
+    else:  # Trade program
+        # Rwanda program - sliders for TRADE, ASST, ASST_SHIFT, NA
+        sliders = [
+            html.Div([
+                html.Label(f"Trade Program (TRADE):", style={'marginBottom': '5px', 'display': 'block'}),
+                dcc.Slider(
+                    id='trade-weight',
+                    min=0,
+                    max=100,
+                    step=1,
+                    value=40,  # Default from p50
+                    marks={i: f'{i}%' for i in range(0, 101, 25)},
+                    tooltip={'placement': 'bottom', 'always_visible': True},
+                )
+            ], style={'marginBottom': '15px'}),
+            
+            html.Div([
+                html.Label(f"Assistant (ASST):", style={'marginBottom': '5px', 'display': 'block'}),
+                dcc.Slider(
+                    id='asst-weight-trade',
+                    min=0,
+                    max=100,
+                    step=1,
+                    value=30,  # Default from p50
+                    marks={i: f'{i}%' for i in range(0, 101, 25)},
+                    tooltip={'placement': 'bottom', 'always_visible': True},
+                )
+            ], style={'marginBottom': '15px'}),
+            
+            html.Div([
+                html.Label(f"Assistant Shift (ASST_SHIFT):", style={'marginBottom': '5px', 'display': 'block'}),
+                dcc.Slider(
+                    id='asst-shift-weight-trade',
+                    min=0,
+                    max=100,
+                    step=1,
+                    value=15,  # Default from p50
+                    marks={i: f'{i}%' for i in range(0, 101, 25)},
+                    tooltip={'placement': 'bottom', 'always_visible': True},
+                )
+            ], style={'marginBottom': '15px'}),
+            
+            html.Div([
+                html.Label(f"No Completion (NA):", style={'marginBottom': '5px', 'display': 'block'}),
+                dcc.Slider(
+                    id='na-weight-trade',
+                    min=0,
+                    max=100,
+                    step=1,
+                    value=15,  # Default from p50
+                    marks={i: f'{i}%' for i in range(0, 101, 25)},
+                    tooltip={'placement': 'bottom', 'always_visible': True},
+                )
+            ], style={'marginBottom': '5px'})
+        ]
+    
+    return sliders
+
+# Add a callback to update the calculated students display
+@app.callback(
+    Output('calculated-students', 'children'),
+    [Input('program-type', 'value')]
+)
+def update_calculated_students(program_type):
+    # Fixed initial investment
+    initial_investment = 1000000
+    
+    # Get price per student based on program type
+    if program_type == 'University':
+        price_per_student = 29000
+        program_name = 'Uganda'
+    elif program_type == 'Nurse':
+        price_per_student = 16650
+        program_name = 'Kenya'
+    elif program_type == 'Trade':
+        price_per_student = 16650
+        program_name = 'Rwanda'
+    else:
+        return "Invalid program type"
+    
+    # Calculate number of students (reserving 2% for cash buffer)
+    available_for_students = initial_investment * 0.98
+    initial_students = int(available_for_students / price_per_student)
+    
+    return html.Div([
+        html.P(f"{program_name} Program - Price per student: ${price_per_student:,.2f}", style={'marginBottom': '5px'}),
+        html.P([
+            f"Initial investment: ${initial_investment:,} (fixed)",
+            html.Br(),
+            f"Initial students that can be funded: {initial_students}"
+        ], style={'fontWeight': 'bold'})
+    ])
+
+# Add callbacks to update stored weights
+@app.callback(
+    Output('stored-weights', 'data', allow_duplicate=True),
+    [Input('program-type', 'value'),
+     Input('degree-weight-sliders', 'children')],
+    [State('stored-weights', 'data')],
+    prevent_initial_call='initial_duplicate'
+)
+def update_stored_weights(program_type, sliders, current_data):
+    # Initialize or update stored weights
+    stored_data = current_data or {}
+    
+    # Set default values based on program type
+    if program_type == 'University':
+        stored_data.update({
+            'ba-weight': 45,
+            'ma-weight': 24,
+            'asst-shift-weight-uni': 27,
+            'na-weight-uni': 4
+        })
+    elif program_type == 'Nurse':
+        stored_data.update({
+            'nurse-weight': 30,
+            'asst-weight-nurse': 40,
+            'asst-shift-weight-nurse': 20,
+            'na-weight-nurse': 10
+        })
+    else:  # Trade
+        stored_data.update({
+            'trade-weight': 40,
+            'asst-weight-trade': 30,
+            'asst-shift-weight-trade': 15,
+            'na-weight-trade': 15
+        })
+    
+    return stored_data
+
+# Add callback to update totals when sliders change
+@app.callback(
+    Output('total-weight-message', 'children'),
+    Output('total-weight-message', 'style'),
+    [Input('stored-weights', 'data'),
+     Input('program-type', 'value')]
+)
+def update_total_message(stored_weights, program_type):
+    if not stored_weights:
+        return "Total: 100% ✓", {'color': 'green', 'marginTop': '10px', 'fontSize': '14px', 'fontWeight': 'bold'}
+    
+    # Calculate total based on program type
+    total = 0
+    if program_type == 'University':
+        weights = [
+            stored_weights.get('ba-weight', 45),
+            stored_weights.get('ma-weight', 24),
+            stored_weights.get('asst-shift-weight-uni', 27),
+            stored_weights.get('na-weight-uni', 4)
+        ]
+        total = sum(weights)
+    elif program_type == 'Nurse':
+        weights = [
+            stored_weights.get('nurse-weight', 30),
+            stored_weights.get('asst-weight-nurse', 40),
+            stored_weights.get('asst-shift-weight-nurse', 20),
+            stored_weights.get('na-weight-nurse', 10)
+        ]
+        total = sum(weights)
+    else:  # Trade
+        weights = [
+            stored_weights.get('trade-weight', 40),
+            stored_weights.get('asst-weight-trade', 30),
+            stored_weights.get('asst-shift-weight-trade', 15),
+            stored_weights.get('na-weight-trade', 15)
+        ]
+        total = sum(weights)
+    
+    if total == 100:
+        return f"Total: {total}% ✓", {'color': 'green', 'marginTop': '10px', 'fontSize': '14px', 'fontWeight': 'bold'}
+    else:
+        return f"Total: {total}% (must equal 100%)", {'color': 'red', 'marginTop': '10px', 'fontSize': '14px', 'fontWeight': 'bold'}
+
+# Add a callback to show/hide the custom weights container
+@app.callback(
+    Output('custom-weights-container', 'style'),
+    [Input('simulation-mode', 'value')]
+)
+def toggle_custom_weights(mode):
+    if mode == 'custom':
+        return {'marginBottom': '20px', 'backgroundColor': '#e3f2fd', 'padding': '15px', 'borderRadius': '5px', 'display': 'block'}
+    else:
+        return {'display': 'none'}
+
 # Main callback for running simulations and updating results
 @app.callback(
     [Output('simulation-results', 'children'),
@@ -1288,7 +1445,8 @@ def create_custom_degree_params(program_type, ba_weight=None, ma_weight=None, as
      Output('utility-breakdown-graph', 'figure'),
      Output('relative-performance-graph', 'figure'),
      Output('percentile-comparison-graph', 'figure'),
-     Output('yearly-cash-flow-table', 'children')],
+     Output('yearly-cash-flow-table', 'children'),
+     Output('loading-simulation', 'parent_className')],  # Added for loading spinner
     [Input('run-button', 'n_clicks')],
     [State('program-type', 'value'),
      State('initial-investment', 'value'),
@@ -1303,7 +1461,7 @@ def update_results(n_clicks, program_type, initial_investment,
                   home_prob, unemployment_rate, inflation_rate,
                   stored_weights, simulation_mode):
     if n_clicks == 0:
-        return dash.no_update, dash.no_update, dash.no_update, dash.no_update, dash.no_update, dash.no_update, dash.no_update, dash.no_update
+        return dash.no_update, dash.no_update, dash.no_update, dash.no_update, dash.no_update, dash.no_update, dash.no_update, dash.no_update, dash.no_update
     
     # Get weights from stored weights
     stored_weights = stored_weights or {}
@@ -1392,6 +1550,34 @@ def update_results(n_clicks, program_type, initial_investment,
                 'exits': exits
             })
         
+        # Check if we can use cached results for percentile mode
+        use_cached = False
+        if simulation_mode == 'percentile' and percentile != 'Custom':
+            cache_key = f"{program_type}_{percentile}"
+            if cache_key in cached_results:
+                all_results[percentile] = cached_results[cache_key]
+                
+                # Use cached yearly data if available
+                if cache_key in cached_yearly_data:
+                    yearly_data_by_percentile[percentile] = cached_yearly_data[cache_key]
+                else:
+                    # Generate yearly data based on cached results
+                    for i in range(45):  # Assume 45 years
+                        yearly_data.append({
+                            'year': i,
+                            'cash': all_results[percentile].get('yearly_cash', [])[i] if i < len(all_results[percentile].get('yearly_cash', [])) else 0,
+                            'total_contracts': all_results[percentile]['contract_metrics']['total_contracts'],
+                            'active_contracts': all_results[percentile].get('active_contracts', 0),
+                            'returns': all_results[percentile].get('returns', 0),
+                            'exits': all_results[percentile]['contract_metrics'].get('payment_cap_exits', 0)
+                        })
+                    
+                    yearly_data_by_percentile[percentile] = yearly_data
+                
+                use_cached = True
+                print(f"Using cached results for {program_type} {percentile}")
+                continue
+        
         # Use different degree params based on simulation mode
         if simulation_mode == 'percentile':
             # For percentile mode, use the original create_degree_params function
@@ -1402,6 +1588,10 @@ def update_results(n_clicks, program_type, initial_investment,
                                                         nurse_weight, asst_weight_nurse, asst_shift_weight_nurse, na_weight_nurse,
                                                         trade_weight, asst_weight_trade, asst_shift_weight_trade, na_weight_trade)
         
+        # Skip simulation if we used cached results
+        if use_cached:
+            continue
+            
         # Run simulation
         results = simulate_impact(
             program_type=program_type,
@@ -1421,6 +1611,10 @@ def update_results(n_clicks, program_type, initial_investment,
         # Store results
         all_results[percentile] = results
         yearly_data_by_percentile[percentile] = yearly_data
+        
+        # Cache percentile results for future use
+        if simulation_mode == 'percentile' and percentile != 'Custom':
+            save_to_cache(program_type, percentile, results, yearly_data)
     
     # Save results to CSV for visualization
     save_percentile_results_to_csv(all_results, percentiles)
@@ -1943,8 +2137,17 @@ def update_results(n_clicks, program_type, initial_investment,
             barmode='group'
         )
     
-    return summary_table, tables_div, impact_fig, dollars_fig, utility_fig, perf_fig, comparison_fig, cash_flow_table
+    return summary_table, tables_div, impact_fig, dollars_fig, utility_fig, perf_fig, comparison_fig, cash_flow_table, 'loading-simulation'
 
 # Run the app
 if __name__ == '__main__':
-    app.run(debug=True, port=8051) 
+    # Get port from environment variable or use default
+    port = int(os.environ.get('PORT', 8051))
+    debug = os.environ.get('DEBUG', 'True').lower() == 'true'
+    
+    # Log startup information
+    print(f"Starting server on port {port}, debug={debug}")
+    print(f"Precomputation {'skipped' if os.environ.get('SKIP_PRECOMPUTATION', '').lower() == 'true' else 'enabled'}")
+    
+    # Run the app
+    app.run(debug=debug, port=port, host='0.0.0.0') 
