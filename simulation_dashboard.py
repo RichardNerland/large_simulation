@@ -144,6 +144,18 @@ dashboard_layout = html.Div([
             html.Div(id='calculated-students', style={'marginBottom': '20px', 'padding': '10px', 
                                                     'backgroundColor': '#f0f0f0', 'borderRadius': '5px'}),
             
+            # Add note about staggered graduation
+            html.Div([
+                html.P(
+                    "Note: The simulation uses staggered graduation times to model realistic education outcomes:",
+                    style={'fontWeight': 'bold', 'marginBottom': '5px'}
+                ),
+                html.Ul([
+                    html.Li("For BA and ASST degrees: 50% graduate on time, 25% graduate 1 year late, 12.5% graduate 2 years late, 6.25% graduate 3 years late, and 6.25% graduate 4 years late."),
+                    html.Li("For MA, NURSE, and TRADE degrees: 75% graduate on time, 20% graduate 1 year late, 2.5% graduate 2 years late, and 2.5% graduate 3 years late.")
+                ], style={'fontSize': '13px', 'paddingLeft': '20px', 'marginTop': '5px'})
+            ], style={'marginBottom': '20px', 'backgroundColor': '#fffde7', 'padding': '10px', 'borderRadius': '5px', 'border': '1px solid #fff9c4'}),
+            
             # Hidden inputs with default values
             html.Div([
                 dcc.Input(id='home-prob', type='number', value=10, style={'display': 'none'}),
@@ -504,6 +516,10 @@ def update_results(n_clicks, program_type, initial_investment,
     
     financial_table = html.Div([
         html.H4("Financial Metrics by Percentile"),
+        html.P([
+            "This table shows key financial metrics for each percentile scenario, including IRR and student outcomes. ",
+            "The model incorporates realistic graduation delays, with some students taking longer than the nominal time to complete their degrees."
+        ], style={'fontSize': '14px', 'marginBottom': '15px', 'fontStyle': 'italic'}),
         dash_table.DataTable(
             id='financial-table',
             columns=[{"name": i, "id": i} for i in financial_df.columns],

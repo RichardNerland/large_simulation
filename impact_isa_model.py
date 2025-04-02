@@ -107,6 +107,11 @@ class Student:
         self.is_employed = False
         self.is_home = False
         
+        # Calculate actual years to graduate with potential delay
+        self.actual_years_to_complete = _calculate_graduation_delay(
+            degree.years_to_complete, degree.name
+        )
+        
         # Payment tracking
         self.earnings = np.zeros(num_years)
         self.counterfactual_earnings = np.zeros(num_years)
@@ -133,7 +138,7 @@ class Student:
 
     def has_graduated(self, relative_year: int) -> bool:
         """Check if the student has graduated by the given year."""
-        return relative_year >= self.degree.years_to_complete
+        return relative_year >= self.actual_years_to_complete
 
     def calculate_earnings(self, relative_year: int, year: Year) -> float:
         """
@@ -152,7 +157,7 @@ class Student:
             
         # Check if student has returned home - if so, they should not benefit from education
         # They should earn at counterfactual levels instead
-        if self.will_return_home and relative_year >= self.degree.years_to_complete:
+        if self.will_return_home and relative_year >= self.actual_years_to_complete:
             self.is_home = True
             # Use counterfactual earnings for home returns
             return self.calculate_counterfactual_earnings(relative_year, year)
@@ -186,7 +191,7 @@ class Student:
             return 0
         
         # If just graduated or earnings power not set yet, set initial earnings power
-        if relative_year == self.degree.years_to_complete or self.earnings_power == 0:
+        if relative_year == self.actual_years_to_complete or self.earnings_power == 0:
             # Adjust initial salary for inflation at time of graduation
             initial_salary = self.degree.mean_earnings * year.deflator
             salary_std = self.degree.stdev * year.deflator
@@ -778,7 +783,7 @@ def simulate_impact(
             student.counterfactual_earnings[relative_year] = counterfactual
             
             # Check for home return
-            if student.is_graduated and student.will_return_home and relative_year >= student.degree.years_to_complete:
+            if student.is_graduated and student.will_return_home and relative_year >= student.actual_years_to_complete:
                 # Mark contract as exited
                 pool.mark_contract_exit(student.id, 'home_return')
                 # Note: earnings are already handled in calculate_earnings method
@@ -1257,6 +1262,55 @@ def aggregate_simulation_results(results: List[Dict]) -> Dict:
         'time_series': time_series,
         'student_outcomes': student_outcomes
     }
+
+def _calculate_graduation_delay(base_years_to_complete: int, degree_name: str = '') -> int:
+    """
+    Calculate a realistic graduation delay based on degree-specific distributions.
+    
+    For BA and ASST degrees:
+    - 50% graduate on time (no delay)
+    - 25% graduate 1 year late (50% of remaining)
+    - 12.5% graduate 2 years late (50% of remaining)
+    - 6.25% graduate 3 years late (50% of remaining)
+    - The rest (6.25%) graduate 4 years late
+    
+    For MA, NURSE, and TRADE degrees:
+    - 75% graduate on time (no delay)
+    - 20% graduate 1 year late
+    - 2.5% graduate 2 years late
+    - 2.5% graduate 3 years late
+    
+    Args:
+        base_years_to_complete: The nominal years to complete the degree
+        degree_name: The type of degree (BA, MA, ASST, NURSE, TRADE, etc.)
+        
+    Returns:
+        Total years to complete including delay
+    """
+    rand = np.random.random()
+    
+    # Apply special distribution for Masters, Nurse, and Trade degrees
+    if degree_name in ['MA', 'NURSE', 'TRADE']:
+        if rand < 0.75:
+            return base_years_to_complete  # Graduate on time
+        elif rand < 0.95:
+            return base_years_to_complete + 1  # 1 year late
+        elif rand < 0.975:
+            return base_years_to_complete + 2  # 2 years late
+        else:
+            return base_years_to_complete + 3  # 3 years late
+    else:
+        # Default distribution for other degrees (BA, ASST, NA, etc.)
+        if rand < 0.5:
+            return base_years_to_complete  # Graduate on time
+        elif rand < 0.75:
+            return base_years_to_complete + 1  # 1 year late
+        elif rand < 0.875:
+            return base_years_to_complete + 2  # 2 years late
+        elif rand < 0.9375:
+            return base_years_to_complete + 3  # 3 years late
+        else:
+            return base_years_to_complete + 4  # 4 years late
 
 def main():
     """
