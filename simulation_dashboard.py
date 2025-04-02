@@ -20,6 +20,9 @@ from impact_isa_model import (
     CounterfactualParams
 )
 
+# Import the landing page layout
+from landing_page import create_landing_page
+
 # Set up default impact parameters
 counterfactual_params = CounterfactualParams(
     base_earnings=2400,
@@ -41,63 +44,7 @@ impact_params = ImpactParams(
 app = dash.Dash(__name__, suppress_callback_exceptions=True)
 server = app.server  # Expose server variable for Gunicorn
 
-# Landing page layout
-landing_page = html.Div([
-    # Header
-    html.Div([
-        html.H1("ISA Impact Simulation Dashboard", 
-               style={'textAlign': 'center', 'margin': '0', 'padding': '20px 0', 'color': '#2c3e50'})
-    ], style={'backgroundColor': '#f8f9fa', 'borderBottom': '1px solid #ddd', 'marginBottom': '20px', 
-              'boxShadow': '0 2px 5px rgba(0,0,0,0.1)', 'width': '100%'}),
-    
-    # Main content
-    html.Div([
-        html.Div([
-            html.H2("About This Dashboard", style={'color': '#2c3e50', 'borderBottom': '2px solid #3498db', 'paddingBottom': '10px'}),
-            html.P([
-                "This dashboard simulates the impact of Income Share Agreements (ISAs) for educational programs like Malengo. ",
-                "It allows you to explore different scenarios and understand how various parameters affect outcomes for both students and program sustainability."
-            ], style={'fontSize': '16px', 'lineHeight': '1.6'}),
-            
-            html.H2("About Malengo (Based on GiveWell's Assessment)", style={'color': '#2c3e50', 'borderBottom': '2px solid #3498db', 'paddingBottom': '10px', 'marginTop': '30px'}),
-            html.P([
-                "Malengo facilitates educational migration to high-income countries for students in low-income countries, providing both mentoring and financial support. ",
-                "Its flagship program supports Ugandan secondary school graduates in migrating to study for bachelor's degrees at universities in Germany."
-            ], style={'fontSize': '16px', 'lineHeight': '1.6'}),
-            
-            html.H3("The Income Sharing Agreement (ISA) Model", style={'color': '#2c3e50', 'marginTop': '25px'}),
-            html.P([
-                "When students join Malengo, they enter into an income sharing agreement (ISA). In exchange for Malengo's support, ",
-                "this agreement requires students to pay back a share of their income, up to a certain limit. Under this arrangement, ",
-                "those students who earn a sufficiently high income would, in effect, provide funding to help sustain Malengo's program."
-            ], style={'fontSize': '16px', 'lineHeight': '1.6'}),
-            
-            html.H3("Impact Pathways", style={'color': '#2c3e50', 'marginTop': '25px'}),
-            html.P("Malengo's program creates impact through multiple channels:", style={'fontSize': '16px', 'lineHeight': '1.6'}),
-            html.Ul([
-                html.Li("Increased incomes for migrants from low-income to high-income countries"),
-                html.Li("Positive spillover effects in migrants' home countries"),
-                html.Li("Increased educational attainment and migration probability of migrants' relatives"),
-                html.Li("Remittance payments that improve close relations' standards of living")
-            ], style={'fontSize': '16px', 'lineHeight': '1.6', 'paddingLeft': '30px'}),
-            
-            html.H3("Program Sustainability", style={'color': '#2c3e50', 'marginTop': '25px'}),
-            html.P([
-                "The long-term goal is for Malengo to sustain its program with little to no philanthropic support. ",
-                "This simulation helps model whether and how quickly the program can become self-sustaining through ISA repayments, ",
-                "which may cover the costs associated with subsequent study cohorts."
-            ], style={'fontSize': '16px', 'lineHeight': '1.6'}),
-            
-            html.Button('Go to Dashboard', id='go-to-dashboard', n_clicks=0,
-                      style={'backgroundColor': '#3498db', 'color': 'white', 'border': 'none',
-                             'padding': '12px 24px', 'borderRadius': '5px', 'cursor': 'pointer',
-                             'fontSize': '16px', 'fontWeight': 'bold', 'marginTop': '30px', 'marginBottom': '30px'})
-        ], style={'maxWidth': '800px', 'margin': '0 auto', 'padding': '20px', 'backgroundColor': 'white', 
-                  'borderRadius': '5px', 'boxShadow': '0 2px 5px rgba(0,0,0,0.1)'})
-    ], style={'padding': '0 20px'})
-])
-
-# Main dashboard layout
+# Main dashboard layout - unchanged
 dashboard_layout = html.Div([
     # Header with navigation
     html.Div([
@@ -136,34 +83,53 @@ dashboard_layout = html.Div([
             
             html.Div([
                 html.Label("Initial Investment ($):", style={'fontWeight': 'bold', 'marginBottom': '5px', 'display': 'block'}),
-                dcc.Input(id='initial-investment', type='number', value=1000000, min=0,
-                         style={'width': '100%', 'padding': '8px', 'borderRadius': '5px', 'border': '1px solid #ddd'})
+                html.Div("$1,000,000 (fixed)", style={'width': '100%', 'padding': '8px', 'borderRadius': '5px', 
+                                                     'border': '1px solid #ddd', 'backgroundColor': '#f5f5f5',
+                                                     'fontStyle': 'italic'})
             ], style={'marginBottom': '20px'}),
+            
+            # Hidden input for initial investment with fixed value
+            dcc.Input(id='initial-investment', type='number', value=1000000, style={'display': 'none'}),
+            
+            # Toggle for choosing between percentile scenarios and custom weights
+            html.Div([
+                html.Label("Simulation Mode:", style={'fontWeight': 'bold', 'marginBottom': '5px', 'display': 'block'}),
+                dcc.RadioItems(
+                    id='simulation-mode',
+                    options=[
+                        {'label': 'Use 5 Percentile Scenarios (P10, P25, P50, P75, P90)', 'value': 'percentile'},
+                        {'label': 'Use Custom Degree Weights', 'value': 'custom'}
+                    ],
+                    value='percentile',
+                    labelStyle={'display': 'block', 'marginBottom': '5px', 'fontSize': '14px'}
+                )
+            ], style={'marginBottom': '15px', 'backgroundColor': '#f8f8f8', 'padding': '10px', 'borderRadius': '5px'}),
+            
+            # Custom weights section (only visible when custom mode is selected)
+            html.Div([
+                html.Label("Custom Degree Weights (%):", style={'fontWeight': 'bold', 'marginBottom': '5px', 'display': 'block'}),
+                
+                # Dynamic sliders for degree weights based on program type
+                html.Div(id='degree-weight-sliders', style={'marginTop': '10px'}),
+                
+                # Message for total weight
+                html.Div(id='total-weight-message', style={'marginTop': '10px', 'fontSize': '14px', 'fontWeight': 'bold'})
+            ], id='custom-weights-container', style={'marginBottom': '20px', 'backgroundColor': '#e3f2fd', 'padding': '15px', 'borderRadius': '5px'}),
             
             # Add a display for calculated initial students
             html.Div(id='calculated-students', style={'marginBottom': '20px', 'padding': '10px', 
                                                     'backgroundColor': '#f0f0f0', 'borderRadius': '5px'}),
             
-            # Add note about staggered graduation
-            html.Div([
-                html.P(
-                    "Note: The simulation uses staggered graduation times to model realistic education outcomes:",
-                    style={'fontWeight': 'bold', 'marginBottom': '5px'}
-                ),
-                html.Ul([
-                    html.Li("For BA and ASST degrees: 50% graduate on time, 25% graduate 1 year late, 12.5% graduate 2 years late, 6.25% graduate 3 years late, and 6.25% graduate 4 years late."),
-                    html.Li("For MA, NURSE, and TRADE degrees: 75% graduate on time, 20% graduate 1 year late, 2.5% graduate 2 years late, and 2.5% graduate 3 years late.")
-                ], style={'fontSize': '13px', 'paddingLeft': '20px', 'marginTop': '5px'})
-            ], style={'marginBottom': '20px', 'backgroundColor': '#fffde7', 'padding': '10px', 'borderRadius': '5px', 'border': '1px solid #fff9c4'}),
-            
             # Hidden inputs with default values
             html.Div([
                 dcc.Input(id='home-prob', type='number', value=10, style={'display': 'none'}),
                 dcc.Input(id='unemployment-rate', type='number', value=8, style={'display': 'none'}),
-                dcc.Input(id='inflation-rate', type='number', value=2, style={'display': 'none'})
+                dcc.Input(id='inflation-rate', type='number', value=2, style={'display': 'none'}),
+                # Add stores for degree weights
+                dcc.Store(id='stored-weights', data={})
             ]),
             
-            html.Button('Run Percentile Simulation', id='run-button', n_clicks=0, 
+            html.Button('Run Simulation', id='run-button', n_clicks=0, 
                        style={'width': '100%', 'padding': '12px', 'backgroundColor': '#4CAF50', 'color': 'white',
                               'border': 'none', 'borderRadius': '5px', 'cursor': 'pointer', 'fontSize': '16px',
                               'fontWeight': 'bold', 'marginTop': '20px'})
@@ -261,6 +227,9 @@ dashboard_layout = html.Div([
     ], style={'display': 'flex', 'flexWrap': 'wrap', 'margin': '0 20px'})
 ])
 
+# Get the landing page layout from the imported function
+landing_page = create_landing_page()
+
 # Define the app layout with both layouts included but only one visible at a time
 app.layout = html.Div([
     # Store the current page
@@ -308,6 +277,854 @@ def navigate(go_to_dashboard, back_to_info):
     
     return dash.no_update
 
+# Callback to generate degree weight sliders based on program type
+@app.callback(
+    Output('degree-weight-sliders', 'children'),
+    [Input('program-type', 'value')]
+)
+def update_degree_sliders(program_type):
+    # Create different sliders based on program type
+    if program_type == 'University':
+        # Uganda program - sliders for BA, MA, ASST_SHIFT, NA
+        sliders = [
+            html.Div([
+                html.Label(f"Bachelor's Degree (BA):", style={'marginBottom': '5px', 'display': 'block'}),
+                dcc.Slider(
+                    id='ba-weight',
+                    min=0,
+                    max=100,
+                    step=1,
+                    value=45,  # Default from p50
+                    marks={i: f'{i}%' for i in range(0, 101, 25)},
+                    tooltip={'placement': 'bottom', 'always_visible': True},
+                )
+            ], style={'marginBottom': '15px'}),
+            
+            html.Div([
+                html.Label(f"Master's Degree (MA):", style={'marginBottom': '5px', 'display': 'block'}),
+                dcc.Slider(
+                    id='ma-weight',
+                    min=0,
+                    max=100,
+                    step=1,
+                    value=24,  # Default from p50
+                    marks={i: f'{i}%' for i in range(0, 101, 25)},
+                    tooltip={'placement': 'bottom', 'always_visible': True},
+                )
+            ], style={'marginBottom': '15px'}),
+            
+            html.Div([
+                html.Label(f"Assistant Shift (ASST_SHIFT):", style={'marginBottom': '5px', 'display': 'block'}),
+                dcc.Slider(
+                    id='asst-shift-weight-uni',
+                    min=0,
+                    max=100,
+                    step=1,
+                    value=27,  # Default from p50
+                    marks={i: f'{i}%' for i in range(0, 101, 25)},
+                    tooltip={'placement': 'bottom', 'always_visible': True},
+                )
+            ], style={'marginBottom': '15px'}),
+            
+            html.Div([
+                html.Label(f"No Completion (NA):", style={'marginBottom': '5px', 'display': 'block'}),
+                dcc.Slider(
+                    id='na-weight-uni',
+                    min=0,
+                    max=100,
+                    step=1,
+                    value=4,  # Default from p50
+                    marks={i: f'{i}%' for i in range(0, 101, 25)},
+                    tooltip={'placement': 'bottom', 'always_visible': True},
+                )
+            ], style={'marginBottom': '5px'})
+        ]
+    
+    elif program_type == 'Nurse':
+        # Kenya program - sliders for NURSE, ASST, ASST_SHIFT, NA
+        sliders = [
+            html.Div([
+                html.Label(f"Nursing Degree (NURSE):", style={'marginBottom': '5px', 'display': 'block'}),
+                dcc.Slider(
+                    id='nurse-weight',
+                    min=0,
+                    max=100,
+                    step=1,
+                    value=30,  # Default from p50
+                    marks={i: f'{i}%' for i in range(0, 101, 25)},
+                    tooltip={'placement': 'bottom', 'always_visible': True},
+                )
+            ], style={'marginBottom': '15px'}),
+            
+            html.Div([
+                html.Label(f"Assistant (ASST):", style={'marginBottom': '5px', 'display': 'block'}),
+                dcc.Slider(
+                    id='asst-weight-nurse',
+                    min=0,
+                    max=100,
+                    step=1,
+                    value=40,  # Default from p50
+                    marks={i: f'{i}%' for i in range(0, 101, 25)},
+                    tooltip={'placement': 'bottom', 'always_visible': True},
+                )
+            ], style={'marginBottom': '15px'}),
+            
+            html.Div([
+                html.Label(f"Assistant Shift (ASST_SHIFT):", style={'marginBottom': '5px', 'display': 'block'}),
+                dcc.Slider(
+                    id='asst-shift-weight-nurse',
+                    min=0,
+                    max=100,
+                    step=1,
+                    value=20,  # Default from p50
+                    marks={i: f'{i}%' for i in range(0, 101, 25)},
+                    tooltip={'placement': 'bottom', 'always_visible': True},
+                )
+            ], style={'marginBottom': '15px'}),
+            
+            html.Div([
+                html.Label(f"No Completion (NA):", style={'marginBottom': '5px', 'display': 'block'}),
+                dcc.Slider(
+                    id='na-weight-nurse',
+                    min=0,
+                    max=100,
+                    step=1,
+                    value=10,  # Default from p50
+                    marks={i: f'{i}%' for i in range(0, 101, 25)},
+                    tooltip={'placement': 'bottom', 'always_visible': True},
+                )
+            ], style={'marginBottom': '5px'})
+        ]
+    
+    else:  # Trade program
+        # Rwanda program - sliders for TRADE, ASST, ASST_SHIFT, NA
+        sliders = [
+            html.Div([
+                html.Label(f"Trade Program (TRADE):", style={'marginBottom': '5px', 'display': 'block'}),
+                dcc.Slider(
+                    id='trade-weight',
+                    min=0,
+                    max=100,
+                    step=1,
+                    value=40,  # Default from p50
+                    marks={i: f'{i}%' for i in range(0, 101, 25)},
+                    tooltip={'placement': 'bottom', 'always_visible': True},
+                )
+            ], style={'marginBottom': '15px'}),
+            
+            html.Div([
+                html.Label(f"Assistant (ASST):", style={'marginBottom': '5px', 'display': 'block'}),
+                dcc.Slider(
+                    id='asst-weight-trade',
+                    min=0,
+                    max=100,
+                    step=1,
+                    value=30,  # Default from p50
+                    marks={i: f'{i}%' for i in range(0, 101, 25)},
+                    tooltip={'placement': 'bottom', 'always_visible': True},
+                )
+            ], style={'marginBottom': '15px'}),
+            
+            html.Div([
+                html.Label(f"Assistant Shift (ASST_SHIFT):", style={'marginBottom': '5px', 'display': 'block'}),
+                dcc.Slider(
+                    id='asst-shift-weight-trade',
+                    min=0,
+                    max=100,
+                    step=1,
+                    value=15,  # Default from p50
+                    marks={i: f'{i}%' for i in range(0, 101, 25)},
+                    tooltip={'placement': 'bottom', 'always_visible': True},
+                )
+            ], style={'marginBottom': '15px'}),
+            
+            html.Div([
+                html.Label(f"No Completion (NA):", style={'marginBottom': '5px', 'display': 'block'}),
+                dcc.Slider(
+                    id='na-weight-trade',
+                    min=0,
+                    max=100,
+                    step=1,
+                    value=15,  # Default from p50
+                    marks={i: f'{i}%' for i in range(0, 101, 25)},
+                    tooltip={'placement': 'bottom', 'always_visible': True},
+                )
+            ], style={'marginBottom': '5px'})
+        ]
+    
+    return sliders
+
+# Add a callback to update the calculated students display
+@app.callback(
+    Output('calculated-students', 'children'),
+    [Input('program-type', 'value')]
+)
+def update_calculated_students(program_type):
+    # Fixed initial investment
+    initial_investment = 1000000
+    
+    # Get price per student based on program type
+    if program_type == 'University':
+        price_per_student = 29000
+        program_name = 'Uganda'
+    elif program_type == 'Nurse':
+        price_per_student = 16650
+        program_name = 'Kenya'
+    elif program_type == 'Trade':
+        price_per_student = 15000
+        program_name = 'Rwanda'
+    else:
+        return "Invalid program type"
+    
+    # Calculate number of students (reserving 2% for cash buffer)
+    available_for_students = initial_investment * 0.98
+    initial_students = int(available_for_students / price_per_student)
+    
+    return html.Div([
+        html.P(f"{program_name} Program - Price per student: ${price_per_student:,.2f}", style={'marginBottom': '5px'}),
+        html.P([
+            f"Initial investment: ${initial_investment:,} (fixed)",
+            html.Br(),
+            f"Initial students that can be funded: {initial_students}"
+        ], style={'fontWeight': 'bold'})
+    ])
+
+# Add callbacks to update stored weights
+@app.callback(
+    Output('stored-weights', 'data', allow_duplicate=True),
+    [Input('program-type', 'value'),
+     Input('degree-weight-sliders', 'children')],
+    [State('stored-weights', 'data')],
+    prevent_initial_call='initial_duplicate'
+)
+def update_stored_weights(program_type, sliders, current_data):
+    # Initialize or update stored weights
+    stored_data = current_data or {}
+    
+    # Set default values based on program type
+    if program_type == 'University':
+        stored_data.update({
+            'ba-weight': 45,
+            'ma-weight': 24,
+            'asst-shift-weight-uni': 27,
+            'na-weight-uni': 4
+        })
+    elif program_type == 'Nurse':
+        stored_data.update({
+            'nurse-weight': 30,
+            'asst-weight-nurse': 40,
+            'asst-shift-weight-nurse': 20,
+            'na-weight-nurse': 10
+        })
+    else:  # Trade
+        stored_data.update({
+            'trade-weight': 40,
+            'asst-weight-trade': 30,
+            'asst-shift-weight-trade': 15,
+            'na-weight-trade': 15
+        })
+    
+    return stored_data
+
+# Add callback to update totals when sliders change
+@app.callback(
+    Output('total-weight-message', 'children'),
+    Output('total-weight-message', 'style'),
+    [Input('stored-weights', 'data'),
+     Input('program-type', 'value')]
+)
+def update_total_message(stored_weights, program_type):
+    if not stored_weights:
+        return "Total: 100% ✓", {'color': 'green', 'marginTop': '10px', 'fontSize': '14px', 'fontWeight': 'bold'}
+    
+    # Calculate total based on program type
+    total = 0
+    if program_type == 'University':
+        weights = [
+            stored_weights.get('ba-weight', 45),
+            stored_weights.get('ma-weight', 24),
+            stored_weights.get('asst-shift-weight-uni', 27),
+            stored_weights.get('na-weight-uni', 4)
+        ]
+        total = sum(weights)
+    elif program_type == 'Nurse':
+        weights = [
+            stored_weights.get('nurse-weight', 30),
+            stored_weights.get('asst-weight-nurse', 40),
+            stored_weights.get('asst-shift-weight-nurse', 20),
+            stored_weights.get('na-weight-nurse', 10)
+        ]
+        total = sum(weights)
+    else:  # Trade
+        weights = [
+            stored_weights.get('trade-weight', 40),
+            stored_weights.get('asst-weight-trade', 30),
+            stored_weights.get('asst-shift-weight-trade', 15),
+            stored_weights.get('na-weight-trade', 15)
+        ]
+        total = sum(weights)
+    
+    if total == 100:
+        return f"Total: {total}% ✓", {'color': 'green', 'marginTop': '10px', 'fontSize': '14px', 'fontWeight': 'bold'}
+    else:
+        return f"Total: {total}% (must equal 100%)", {'color': 'red', 'marginTop': '10px', 'fontSize': '14px', 'fontWeight': 'bold'}
+
+# Add a callback to show/hide the custom weights container
+@app.callback(
+    Output('custom-weights-container', 'style'),
+    [Input('simulation-mode', 'value')]
+)
+def toggle_custom_weights(mode):
+    if mode == 'custom':
+        return {'marginBottom': '20px', 'backgroundColor': '#e3f2fd', 'padding': '15px', 'borderRadius': '5px', 'display': 'block'}
+    else:
+        return {'display': 'none'}
+
+# Define function to create degree parameters based on percentile
+def create_degree_params(percentile, program_type):
+    """
+    Creates degree parameters based on percentile scenario.
+    
+    Args:
+        percentile: The percentile scenario (p10, p25, p50, p75, p90)
+        program_type: The program type (University, Nurse, Trade)
+        
+    Returns:
+        List of tuples (DegreeParams, weight) to use in simulation
+    """
+    if program_type == 'University':  # Uganda program
+        if percentile == 'p10':
+            return [
+                (DegreeParams(
+                    name='BA',
+                    initial_salary=41300,
+                    salary_std=6000,
+                    annual_growth=0.03,
+                    years_to_complete=4,
+                    home_prob=0.1
+                ), 0.20),
+                (DegreeParams(
+                    name='MA',
+                    initial_salary=46709,
+                    salary_std=6600,
+                    annual_growth=0.04,
+                    years_to_complete=6,
+                    home_prob=0.1
+                ), 0.10),
+                (DegreeParams(
+                    name='ASST_SHIFT',
+                    initial_salary=31500,
+                    salary_std=2800,
+                    annual_growth=0.005,
+                    years_to_complete=6,
+                    home_prob=0.1
+                ), 0.35),
+                (DegreeParams(
+                    name='NA',
+                    initial_salary=2200,
+                    salary_std=640,
+                    annual_growth=0.01,
+                    years_to_complete=2,
+                    home_prob=1.0
+                ), 0.35)
+            ]
+        elif percentile == 'p25':
+            return [
+                (DegreeParams(
+                    name='BA',
+                    initial_salary=41300,
+                    salary_std=6000,
+                    annual_growth=0.03,
+                    years_to_complete=4,
+                    home_prob=0.1
+                ), 0.35),
+                (DegreeParams(
+                    name='MA',
+                    initial_salary=46709,
+                    salary_std=6600,
+                    annual_growth=0.04,
+                    years_to_complete=6,
+                    home_prob=0.1
+                ), 0.15),
+                (DegreeParams(
+                    name='ASST_SHIFT',
+                    initial_salary=31500,
+                    salary_std=2800,
+                    annual_growth=0.005,
+                    years_to_complete=6,
+                    home_prob=0.1
+                ), 0.35),
+                (DegreeParams(
+                    name='NA',
+                    initial_salary=2200,
+                    salary_std=640,
+                    annual_growth=0.01,
+                    years_to_complete=2,
+                    home_prob=1.0
+                ), 0.15)
+            ]
+        elif percentile == 'p50':
+            return [
+                (DegreeParams(
+                    name='BA',
+                    initial_salary=41300,
+                    salary_std=6000,
+                    annual_growth=0.03,
+                    years_to_complete=4,
+                    home_prob=0.1
+                ), 0.45),
+                (DegreeParams(
+                    name='MA',
+                    initial_salary=46709,
+                    salary_std=6600,
+                    annual_growth=0.04,
+                    years_to_complete=6,
+                    home_prob=0.1
+                ), 0.24),
+                (DegreeParams(
+                    name='ASST_SHIFT',
+                    initial_salary=31500,
+                    salary_std=2800,
+                    annual_growth=0.005,
+                    years_to_complete=6,
+                    home_prob=0.1
+                ), 0.27),
+                (DegreeParams(
+                    name='NA',
+                    initial_salary=2200,
+                    salary_std=640,
+                    annual_growth=0.01,
+                    years_to_complete=2,
+                    home_prob=1.0
+                ), 0.04)
+            ]
+        elif percentile == 'p75':
+            return [
+                (DegreeParams(
+                    name='BA',
+                    initial_salary=41300,
+                    salary_std=6000,
+                    annual_growth=0.03,
+                    years_to_complete=4,
+                    home_prob=0.1
+                ), 0.55),
+                (DegreeParams(
+                    name='MA',
+                    initial_salary=46709,
+                    salary_std=6600,
+                    annual_growth=0.04,
+                    years_to_complete=6,
+                    home_prob=0.1
+                ), 0.35),
+                (DegreeParams(
+                    name='ASST_SHIFT',
+                    initial_salary=31500,
+                    salary_std=2800,
+                    annual_growth=0.005,
+                    years_to_complete=6,
+                    home_prob=0.1
+                ), 0.08),
+                (DegreeParams(
+                    name='NA',
+                    initial_salary=2200,
+                    salary_std=640,
+                    annual_growth=0.01,
+                    years_to_complete=2,
+                    home_prob=1.0
+                ), 0.02)
+            ]
+        elif percentile == 'p90':
+            return [
+                (DegreeParams(
+                    name='BA',
+                    initial_salary=41300,
+                    salary_std=6000,
+                    annual_growth=0.03,
+                    years_to_complete=4,
+                    home_prob=0.1
+                ), 0.60),
+                (DegreeParams(
+                    name='MA',
+                    initial_salary=46709,
+                    salary_std=6600,
+                    annual_growth=0.04,
+                    years_to_complete=6,
+                    home_prob=0.1
+                ), 0.39),
+                (DegreeParams(
+                    name='ASST_SHIFT',
+                    initial_salary=31500,
+                    salary_std=2800,
+                    annual_growth=0.005,
+                    years_to_complete=6,
+                    home_prob=0.1
+                ), 0.01),
+                (DegreeParams(
+                    name='NA',
+                    initial_salary=2200,
+                    salary_std=640,
+                    annual_growth=0.01,
+                    years_to_complete=2,
+                    home_prob=1.0
+                ), 0.00)
+            ]
+    
+    elif program_type == 'Nurse':  # Kenya program
+        if percentile == 'p10':
+            return [
+                (DegreeParams(
+                    name='NURSE',
+                    initial_salary=40000,
+                    salary_std=4000,
+                    annual_growth=0.02,
+                    years_to_complete=4,
+                    home_prob=0.1
+                ), 0.15),
+                (DegreeParams(
+                    name='ASST',
+                    initial_salary=31500,
+                    salary_std=2800,
+                    annual_growth=0.005,
+                    years_to_complete=3,
+                    home_prob=0.1
+                ), 0.20),
+                (DegreeParams(
+                    name='ASST_SHIFT',
+                    initial_salary=31500,
+                    salary_std=2800,
+                    annual_growth=0.005,
+                    years_to_complete=6,
+                    home_prob=0.1
+                ), 0.25),
+                (DegreeParams(
+                    name='NA',
+                    initial_salary=2200,
+                    salary_std=640,
+                    annual_growth=0.01,
+                    years_to_complete=2,
+                    home_prob=1.0
+                ), 0.40)
+            ]
+        elif percentile == 'p25':
+            return [
+                (DegreeParams(
+                    name='NURSE',
+                    initial_salary=40000,
+                    salary_std=4000,
+                    annual_growth=0.02,
+                    years_to_complete=4,
+                    home_prob=0.1
+                ), 0.20),
+                (DegreeParams(
+                    name='ASST',
+                    initial_salary=31500,
+                    salary_std=2800,
+                    annual_growth=0.005,
+                    years_to_complete=3,
+                    home_prob=0.1
+                ), 0.35),
+                (DegreeParams(
+                    name='ASST_SHIFT',
+                    initial_salary=31500,
+                    salary_std=2800,
+                    annual_growth=0.005,
+                    years_to_complete=6,
+                    home_prob=0.1
+                ), 0.25),
+                (DegreeParams(
+                    name='NA',
+                    initial_salary=2200,
+                    salary_std=640,
+                    annual_growth=0.01,
+                    years_to_complete=2,
+                    home_prob=1.0
+                ), 0.20)
+            ]
+        elif percentile == 'p50':
+            return [
+                (DegreeParams(
+                    name='NURSE',
+                    initial_salary=40000,
+                    salary_std=4000,
+                    annual_growth=0.02,
+                    years_to_complete=4,
+                    home_prob=0.1
+                ), 0.30),
+                (DegreeParams(
+                    name='ASST',
+                    initial_salary=31500,
+                    salary_std=2800,
+                    annual_growth=0.005,
+                    years_to_complete=3,
+                    home_prob=0.1
+                ), 0.40),
+                (DegreeParams(
+                    name='ASST_SHIFT',
+                    initial_salary=31500,
+                    salary_std=2800,
+                    annual_growth=0.005,
+                    years_to_complete=6,
+                    home_prob=0.1
+                ), 0.20),
+                (DegreeParams(
+                    name='NA',
+                    initial_salary=2200,
+                    salary_std=640,
+                    annual_growth=0.01,
+                    years_to_complete=2,
+                    home_prob=1.0
+                ), 0.10)
+            ]
+        elif percentile == 'p75':
+            return [
+                (DegreeParams(
+                    name='NURSE',
+                    initial_salary=40000,
+                    salary_std=4000,
+                    annual_growth=0.02,
+                    years_to_complete=4,
+                    home_prob=0.1
+                ), 0.45),
+                (DegreeParams(
+                    name='ASST',
+                    initial_salary=31500,
+                    salary_std=2800,
+                    annual_growth=0.005,
+                    years_to_complete=3,
+                    home_prob=0.1
+                ), 0.40),
+                (DegreeParams(
+                    name='ASST_SHIFT',
+                    initial_salary=31500,
+                    salary_std=2800,
+                    annual_growth=0.005,
+                    years_to_complete=6,
+                    home_prob=0.1
+                ), 0.10),
+                (DegreeParams(
+                    name='NA',
+                    initial_salary=2200,
+                    salary_std=640,
+                    annual_growth=0.01,
+                    years_to_complete=2,
+                    home_prob=1.0
+                ), 0.05)
+            ]
+        elif percentile == 'p90':
+            return [
+                (DegreeParams(
+                    name='NURSE',
+                    initial_salary=40000,
+                    salary_std=4000,
+                    annual_growth=0.02,
+                    years_to_complete=4,
+                    home_prob=0.1
+                ), 0.60),
+                (DegreeParams(
+                    name='ASST',
+                    initial_salary=31500,
+                    salary_std=2800,
+                    annual_growth=0.005,
+                    years_to_complete=3,
+                    home_prob=0.1
+                ), 0.35),
+                (DegreeParams(
+                    name='ASST_SHIFT',
+                    initial_salary=31500,
+                    salary_std=2800,
+                    annual_growth=0.005,
+                    years_to_complete=6,
+                    home_prob=0.1
+                ), 0.05),
+                (DegreeParams(
+                    name='NA',
+                    initial_salary=2200,
+                    salary_std=640,
+                    annual_growth=0.01,
+                    years_to_complete=2,
+                    home_prob=1.0
+                ), 0.00)
+            ]
+    
+    else:  # Trade program
+        if percentile == 'p10':
+            return [
+                (DegreeParams(
+                    name='TRADE',
+                    initial_salary=35000,
+                    salary_std=3000,
+                    annual_growth=0.02,
+                    years_to_complete=3,
+                    home_prob=0.1
+                ), 0.20),
+                (DegreeParams(
+                    name='ASST',
+                    initial_salary=31500,
+                    salary_std=2800,
+                    annual_growth=0.005,
+                    years_to_complete=3,
+                    home_prob=0.1
+                ), 0.15),
+                (DegreeParams(
+                    name='ASST_SHIFT',
+                    initial_salary=31500,
+                    salary_std=2800,
+                    annual_growth=0.005,
+                    years_to_complete=6,
+                    home_prob=0.1
+                ), 0.25),
+                (DegreeParams(
+                    name='NA',
+                    initial_salary=2200,
+                    salary_std=640,
+                    annual_growth=0.01,
+                    years_to_complete=2,
+                    home_prob=1.0
+                ), 0.40)
+            ]
+        elif percentile == 'p25':
+            return [
+                (DegreeParams(
+                    name='TRADE',
+                    initial_salary=35000,
+                    salary_std=3000,
+                    annual_growth=0.02,
+                    years_to_complete=3,
+                    home_prob=0.1
+                ), 0.30),
+                (DegreeParams(
+                    name='ASST',
+                    initial_salary=31500,
+                    salary_std=2800,
+                    annual_growth=0.005,
+                    years_to_complete=3,
+                    home_prob=0.1
+                ), 0.20),
+                (DegreeParams(
+                    name='ASST_SHIFT',
+                    initial_salary=31500,
+                    salary_std=2800,
+                    annual_growth=0.005,
+                    years_to_complete=6,
+                    home_prob=0.1
+                ), 0.20),
+                (DegreeParams(
+                    name='NA',
+                    initial_salary=2200,
+                    salary_std=640,
+                    annual_growth=0.01,
+                    years_to_complete=2,
+                    home_prob=1.0
+                ), 0.30)
+            ]
+        elif percentile == 'p50':
+            return [
+                (DegreeParams(
+                    name='TRADE',
+                    initial_salary=35000,
+                    salary_std=3000,
+                    annual_growth=0.02,
+                    years_to_complete=3,
+                    home_prob=0.1
+                ), 0.40),
+                (DegreeParams(
+                    name='ASST',
+                    initial_salary=31500,
+                    salary_std=2800,
+                    annual_growth=0.005,
+                    years_to_complete=3,
+                    home_prob=0.1
+                ), 0.30),
+                (DegreeParams(
+                    name='ASST_SHIFT',
+                    initial_salary=31500,
+                    salary_std=2800,
+                    annual_growth=0.005,
+                    years_to_complete=6,
+                    home_prob=0.1
+                ), 0.15),
+                (DegreeParams(
+                    name='NA',
+                    initial_salary=2200,
+                    salary_std=640,
+                    annual_growth=0.01,
+                    years_to_complete=2,
+                    home_prob=1.0
+                ), 0.15)
+            ]
+        elif percentile == 'p75':
+            return [
+                (DegreeParams(
+                    name='TRADE',
+                    initial_salary=35000,
+                    salary_std=3000,
+                    annual_growth=0.02,
+                    years_to_complete=3,
+                    home_prob=0.1
+                ), 0.50),
+                (DegreeParams(
+                    name='ASST',
+                    initial_salary=31500,
+                    salary_std=2800,
+                    annual_growth=0.005,
+                    years_to_complete=3,
+                    home_prob=0.1
+                ), 0.35),
+                (DegreeParams(
+                    name='ASST_SHIFT',
+                    initial_salary=31500,
+                    salary_std=2800,
+                    annual_growth=0.005,
+                    years_to_complete=6,
+                    home_prob=0.1
+                ), 0.10),
+                (DegreeParams(
+                    name='NA',
+                    initial_salary=2200,
+                    salary_std=640,
+                    annual_growth=0.01,
+                    years_to_complete=2,
+                    home_prob=1.0
+                ), 0.05)
+            ]
+        elif percentile == 'p90':
+            return [
+                (DegreeParams(
+                    name='TRADE',
+                    initial_salary=35000,
+                    salary_std=3000,
+                    annual_growth=0.02,
+                    years_to_complete=3,
+                    home_prob=0.1
+                ), 0.60),
+                (DegreeParams(
+                    name='ASST',
+                    initial_salary=31500,
+                    salary_std=2800,
+                    annual_growth=0.005,
+                    years_to_complete=3,
+                    home_prob=0.1
+                ), 0.35),
+                (DegreeParams(
+                    name='ASST_SHIFT',
+                    initial_salary=31500,
+                    salary_std=2800,
+                    annual_growth=0.005,
+                    years_to_complete=6,
+                    home_prob=0.1
+                ), 0.05),
+                (DegreeParams(
+                    name='NA',
+                    initial_salary=2200,
+                    salary_std=640,
+                    annual_growth=0.01,
+                    years_to_complete=2,
+                    home_prob=1.0
+                ), 0.00)
+            ]
+    
+    return None  # Should never reach here
+
 # Save percentile results to CSV for visualization
 def save_percentile_results_to_csv(all_results, percentiles):
     """Save percentile simulation results to CSV for visualization."""
@@ -329,6 +1146,139 @@ def save_percentile_results_to_csv(all_results, percentiles):
     df.to_csv('percentile_simulation_results.csv', index=False)
     return df
 
+# Create a custom implementation of degree params based on user sliders
+def create_custom_degree_params(program_type, ba_weight=None, ma_weight=None, asst_shift_weight_uni=None, na_weight_uni=None,
+                              nurse_weight=None, asst_weight_nurse=None, asst_shift_weight_nurse=None, na_weight_nurse=None,
+                              trade_weight=None, asst_weight_trade=None, asst_shift_weight_trade=None, na_weight_trade=None):
+    """Create degree parameters based on custom user-defined weights."""
+    
+    # Convert percentage inputs to decimals
+    if program_type == 'University':
+        # Uganda program
+        ba_pct = (ba_weight or 45) / 100
+        ma_pct = (ma_weight or 24) / 100
+        asst_shift_pct = (asst_shift_weight_uni or 27) / 100
+        na_pct = (na_weight_uni or 4) / 100
+        
+        return [
+            (DegreeParams(
+                name='BA',
+                initial_salary=41300,
+                salary_std=6000,
+                annual_growth=0.03,
+                years_to_complete=4,
+                home_prob=0.1
+            ), ba_pct),
+            (DegreeParams(
+                name='MA',
+                initial_salary=46709,
+                salary_std=6600,
+                annual_growth=0.04,
+                years_to_complete=6,
+                home_prob=0.1
+            ), ma_pct),
+            (DegreeParams(
+                name='ASST_SHIFT',
+                initial_salary=31500,
+                salary_std=2800,
+                annual_growth=0.005,
+                years_to_complete=6,
+                home_prob=0.1
+            ), asst_shift_pct),
+            (DegreeParams(
+                name='NA',
+                initial_salary=2200,
+                salary_std=640,
+                annual_growth=0.01,
+                years_to_complete=2,
+                home_prob=1.0
+            ), na_pct)
+        ]
+    
+    elif program_type == 'Nurse':
+        # Kenya program
+        nurse_pct = (nurse_weight or 30) / 100
+        asst_pct = (asst_weight_nurse or 40) / 100
+        asst_shift_pct = (asst_shift_weight_nurse or 20) / 100
+        na_pct = (na_weight_nurse or 10) / 100
+        
+        return [
+            (DegreeParams(
+                name='NURSE',
+                initial_salary=40000,
+                salary_std=4000,
+                annual_growth=0.02,
+                years_to_complete=4,
+                home_prob=0.1
+            ), nurse_pct),
+            (DegreeParams(
+                name='ASST',
+                initial_salary=31500,
+                salary_std=2800,
+                annual_growth=0.005,
+                years_to_complete=3,
+                home_prob=0.1
+            ), asst_pct),
+            (DegreeParams(
+                name='ASST_SHIFT',
+                initial_salary=31500,
+                salary_std=2800,
+                annual_growth=0.005,
+                years_to_complete=6,
+                home_prob=0.1
+            ), asst_shift_pct),
+            (DegreeParams(
+                name='NA',
+                initial_salary=2200,
+                salary_std=640,
+                annual_growth=0.01,
+                years_to_complete=2,
+                home_prob=1.0
+            ), na_pct)
+        ]
+    
+    else:  # Trade program
+        # Rwanda program
+        trade_pct = (trade_weight or 40) / 100
+        asst_pct = (asst_weight_trade or 30) / 100
+        asst_shift_pct = (asst_shift_weight_trade or 15) / 100
+        na_pct = (na_weight_trade or 15) / 100
+        
+        return [
+            (DegreeParams(
+                name='TRADE',
+                initial_salary=35000,
+                salary_std=3000,
+                annual_growth=0.02,
+                years_to_complete=3,
+                home_prob=0.1
+            ), trade_pct),
+            (DegreeParams(
+                name='ASST',
+                initial_salary=31500,
+                salary_std=2800,
+                annual_growth=0.005,
+                years_to_complete=3,
+                home_prob=0.1
+            ), asst_pct),
+            (DegreeParams(
+                name='ASST_SHIFT',
+                initial_salary=31500,
+                salary_std=2800,
+                annual_growth=0.005,
+                years_to_complete=6,
+                home_prob=0.1
+            ), asst_shift_pct),
+            (DegreeParams(
+                name='NA',
+                initial_salary=2200,
+                salary_std=640,
+                annual_growth=0.01,
+                years_to_complete=2,
+                home_prob=1.0
+            ), na_pct)
+        ]
+
 # Main callback for running simulations and updating results
 @app.callback(
     [Output('simulation-results', 'children'),
@@ -344,21 +1294,44 @@ def save_percentile_results_to_csv(all_results, percentiles):
      State('initial-investment', 'value'),
      State('home-prob', 'value'),
      State('unemployment-rate', 'value'),
-     State('inflation-rate', 'value')],
+     State('inflation-rate', 'value'),
+     State('stored-weights', 'data'),
+     State('simulation-mode', 'value')],
     prevent_initial_call=True
 )
 def update_results(n_clicks, program_type, initial_investment, 
-                  home_prob, unemployment_rate, inflation_rate):
+                  home_prob, unemployment_rate, inflation_rate,
+                  stored_weights, simulation_mode):
     if n_clicks == 0:
         return dash.no_update, dash.no_update, dash.no_update, dash.no_update, dash.no_update, dash.no_update, dash.no_update, dash.no_update
+    
+    # Get weights from stored weights
+    stored_weights = stored_weights or {}
+    ba_weight = stored_weights.get('ba-weight', 45)
+    ma_weight = stored_weights.get('ma-weight', 24)
+    asst_shift_weight_uni = stored_weights.get('asst-shift-weight-uni', 27)
+    na_weight_uni = stored_weights.get('na-weight-uni', 4)
+    nurse_weight = stored_weights.get('nurse-weight', 30)
+    asst_weight_nurse = stored_weights.get('asst-weight-nurse', 40)
+    asst_shift_weight_nurse = stored_weights.get('asst-shift-weight-nurse', 20)
+    na_weight_nurse = stored_weights.get('na-weight-nurse', 10)
+    trade_weight = stored_weights.get('trade-weight', 40)
+    asst_weight_trade = stored_weights.get('asst-weight-trade', 30)
+    asst_shift_weight_trade = stored_weights.get('asst-shift-weight-trade', 15)
+    na_weight_trade = stored_weights.get('na-weight-trade', 15)
     
     # Convert percentage inputs to decimals
     home_prob = home_prob / 100
     unemployment_rate = unemployment_rate / 100
     inflation_rate = inflation_rate / 100
     
-    # Define percentiles to simulate
-    percentiles = ['p10', 'p25', 'p50', 'p75', 'p90']
+    # Different simulation modes
+    if simulation_mode == 'percentile':
+        # Define percentiles to simulate
+        percentiles = ['p10', 'p25', 'p50', 'p75', 'p90']
+    else:  # custom mode
+        # Use a single custom percentile
+        percentiles = ['Custom']
     
     # Store results for each percentile
     all_results = {}
@@ -379,7 +1352,17 @@ def update_results(n_clicks, program_type, initial_investment,
                 'exits': exits
             })
         
-        # Run simulation for this percentile
+        # Use different degree params based on simulation mode
+        if simulation_mode == 'percentile':
+            # For percentile mode, use the original create_degree_params function
+            degree_params = create_degree_params(percentile, program_type)
+        else:
+            # For custom mode, use custom weights
+            degree_params = create_custom_degree_params(program_type, ba_weight, ma_weight, asst_shift_weight_uni, na_weight_uni,
+                                                        nurse_weight, asst_weight_nurse, asst_shift_weight_nurse, na_weight_nurse,
+                                                        trade_weight, asst_weight_trade, asst_shift_weight_trade, na_weight_trade)
+        
+        # Run simulation
         results = simulate_impact(
             program_type=program_type,
             initial_investment=initial_investment,
@@ -389,7 +1372,7 @@ def update_results(n_clicks, program_type, initial_investment,
             scenario='baseline',
             remittance_rate=0.1,
             home_prob=home_prob,
-            degree_params=create_degree_params(percentile, program_type),
+            degree_params=degree_params,
             initial_unemployment_rate=unemployment_rate,
             initial_inflation_rate=inflation_rate,
             data_callback=data_callback
@@ -407,7 +1390,7 @@ def update_results(n_clicks, program_type, initial_investment,
     for percentile in percentiles:
         results = all_results[percentile]
         summary_data.append({
-            'Percentile': percentile.upper(),
+            'Scenario': percentile,
             'IRR (%)': f"{results['irr']*100:.2f}%",
             'Students Educated': results['students_educated'],
             'Avg Earnings Gain ($)': f"${results['student_metrics']['avg_earnings_gain']:,.2f}"
@@ -416,7 +1399,7 @@ def update_results(n_clicks, program_type, initial_investment,
     summary_df = pd.DataFrame(summary_data)
     
     summary_table = html.Div([
-        html.H4("Summary Results by Percentile"),
+        html.H4("Simulation Results Summary"),
         dash_table.DataTable(
             id='summary-table',
             columns=[{"name": i, "id": i} for i in summary_df.columns],
@@ -441,8 +1424,16 @@ def update_results(n_clicks, program_type, initial_investment,
     # 1. Degree Distribution Table
     degree_data = []
     for percentile in percentiles:
-        params = create_degree_params(percentile, program_type)
-        row = {'Percentile': percentile.upper()}
+        if simulation_mode == 'percentile':
+            # For percentile scenarios, use the original create_degree_params function
+            params = create_degree_params(percentile, program_type)
+            row = {'Scenario': percentile.upper()}
+        else:
+            # For custom scenario, use the custom weights
+            params = create_custom_degree_params(program_type, ba_weight, ma_weight, asst_shift_weight_uni, na_weight_uni,
+                                                nurse_weight, asst_weight_nurse, asst_shift_weight_nurse, na_weight_nurse,
+                                                trade_weight, asst_weight_trade, asst_shift_weight_trade, na_weight_trade)
+            row = {'Scenario': 'Custom'}
         
         # Add percentages for each degree type based on program type
         if program_type == 'University':
@@ -472,7 +1463,7 @@ def update_results(n_clicks, program_type, initial_investment,
     degree_df = pd.DataFrame(degree_data)
     
     degree_table = html.Div([
-        html.H4("Degree Distribution by Percentile"),
+        html.H4("Degree Distribution"),
         dash_table.DataTable(
             id='degree-table',
             columns=[{"name": i, "id": i} for i in degree_df.columns],
@@ -502,7 +1493,7 @@ def update_results(n_clicks, program_type, initial_investment,
         avg_payment = total_payments / total_contracts if total_contracts > 0 else 0
         
         financial_data.append({
-            'Percentile': percentile.upper(),
+            'Scenario': percentile,
             'IRR (%)': f"{results['irr']*100:.2f}%",
             'Students Educated': results['students_educated'],
             'Cost per Student ($)': f"${initial_investment / results['students_educated']:,.2f}",
@@ -515,9 +1506,9 @@ def update_results(n_clicks, program_type, initial_investment,
     financial_df = pd.DataFrame(financial_data)
     
     financial_table = html.Div([
-        html.H4("Financial Metrics by Percentile"),
+        html.H4("Financial Metrics"),
         html.P([
-            "This table shows key financial metrics for each percentile scenario, including IRR and student outcomes. ",
+            "This table shows key financial metrics for the scenario, including IRR and student outcomes. ",
             "The model incorporates realistic graduation delays, with some students taking longer than the nominal time to complete their degrees."
         ], style={'fontSize': '14px', 'marginBottom': '15px', 'fontStyle': 'italic'}),
         dash_table.DataTable(
@@ -539,7 +1530,7 @@ def update_results(n_clicks, program_type, initial_investment,
     for percentile in percentiles:
         results = all_results[percentile]
         impact_data.append({
-            'Percentile': percentile.upper(),
+            'Scenario': percentile,
             'Avg Earnings Gain ($)': f"${results['student_metrics']['avg_earnings_gain']:,.2f}",
             'Avg Remittance Gain ($)': f"${results['student_metrics']['avg_remittance_gain']:,.2f}"
         })
@@ -547,7 +1538,7 @@ def update_results(n_clicks, program_type, initial_investment,
     impact_df = pd.DataFrame(impact_data)
     
     impact_table = html.Div([
-        html.H4("Student Impact Metrics by Percentile"),
+        html.H4("Student Impact Metrics"),
         dash_table.DataTable(
             id='impact-table',
             columns=[{"name": i, "id": i} for i in impact_df.columns],
@@ -567,7 +1558,7 @@ def update_results(n_clicks, program_type, initial_investment,
     for percentile in percentiles:
         results = all_results[percentile]
         utility_data.append({
-            'Percentile': percentile.upper(),
+            'Scenario': percentile,
             'Avg Total Utility': f"{results['student_metrics']['avg_total_utility_gain_with_extras']:.2f}",
             'Student Utility': f"{results['student_metrics']['avg_student_utility_gain']:.2f}",
             'Remittance Utility': f"{results['student_metrics']['avg_remittance_utility_gain']:.2f}"
@@ -576,7 +1567,7 @@ def update_results(n_clicks, program_type, initial_investment,
     utility_df = pd.DataFrame(utility_data)
     
     utility_table = html.Div([
-        html.H4("Utility Metrics by Percentile"),
+        html.H4("Utility Metrics"),
         dash_table.DataTable(
             id='utility-table',
             columns=[{"name": i, "id": i} for i in utility_df.columns],
@@ -595,8 +1586,12 @@ def update_results(n_clicks, program_type, initial_investment,
     tables_div = html.Div(tables)
     
     # Create yearly cash flow table
-    # Use the median (p50) percentile for the yearly cash flow table
-    yearly_data = yearly_data_by_percentile['p50']
+    if simulation_mode == 'percentile':
+        # Use the P50 data for percentile mode
+        yearly_data = yearly_data_by_percentile['p50']
+    else:
+        # Use the Custom data for custom mode
+        yearly_data = yearly_data_by_percentile['Custom']
     
     # Calculate students funded each year
     students_funded = []
@@ -630,7 +1625,7 @@ def update_results(n_clicks, program_type, initial_investment,
     cash_flow_df = pd.DataFrame(cash_flow_data)
     
     cash_flow_table = html.Div([
-        html.H4("Yearly Cash Flow Data (P50 Percentile)"),
+        html.H4("Yearly Cash Flow Data"),
         dash_table.DataTable(
             id='cash-flow-table',
             columns=[{"name": i, "id": i} for i in cash_flow_df.columns],
@@ -648,50 +1643,71 @@ def update_results(n_clicks, program_type, initial_investment,
     # Create impact metrics graph
     impact_fig = go.Figure()
     
-    # Calculate total utility across all percentiles
-    total_utility_data = []
-    
-    for percentile in percentiles:
-        results = all_results[percentile]
-        # Calculate total utility over all students
+    if simulation_mode == 'percentile':
+        # For percentile mode, show all percentiles
+        for percentile in percentiles:
+            results = all_results[percentile]
+            
+            # Calculate total utility
+            total_student_utility = results['student_metrics']['avg_student_utility_gain'] * results['students_educated']
+            total_remittance_utility = results['student_metrics']['avg_remittance_utility_gain'] * results['students_educated']
+            total_utility = results['student_metrics']['avg_total_utility_gain_with_extras'] * results['students_educated']
+            
+            # Add bars for each percentile
+            impact_fig.add_trace(go.Bar(
+                x=[percentile],
+                y=[total_student_utility],
+                name="Student Utility" if percentile == percentiles[0] else None,
+                marker_color='#3498db',
+                showlegend=percentile == percentiles[0]
+            ))
+            impact_fig.add_trace(go.Bar(
+                x=[percentile],
+                y=[total_remittance_utility],
+                name="Remittance Utility" if percentile == percentiles[0] else None,
+                marker_color='#2ecc71',
+                showlegend=percentile == percentiles[0]
+            ))
+            impact_fig.add_trace(go.Scatter(
+                x=[percentile],
+                y=[total_utility],
+                name="Total Utility (with extras)" if percentile == percentiles[0] else None,
+                mode='markers',
+                marker=dict(size=12, color='#e74c3c'),
+                showlegend=percentile == percentiles[0]
+            ))
+    else:
+        # For custom mode, show single scenario
+        results = all_results['Custom']
+        
+        # Calculate total utility
         total_student_utility = results['student_metrics']['avg_student_utility_gain'] * results['students_educated']
         total_remittance_utility = results['student_metrics']['avg_remittance_utility_gain'] * results['students_educated']
         total_utility = results['student_metrics']['avg_total_utility_gain_with_extras'] * results['students_educated']
         
-        total_utility_data.append({
-            'percentile': percentile.upper(),
-            'total_student_utility': total_student_utility,
-            'total_remittance_utility': total_remittance_utility,
-            'total_utility': total_utility,
-            'students_educated': results['students_educated']
-        })
-    
-    # Add total utility bars
-    for item in total_utility_data:
+        # Create impact metrics graph
         impact_fig.add_trace(go.Bar(
-            x=[item['percentile']],
-            y=[item['total_student_utility']],
+            x=['Custom Scenario'],
+            y=[total_student_utility],
             name="Student Utility",
             marker_color='#3498db'
         ))
         impact_fig.add_trace(go.Bar(
-            x=[item['percentile']],
-            y=[item['total_remittance_utility']],
+            x=['Custom Scenario'],
+            y=[total_remittance_utility],
             name="Remittance Utility",
             marker_color='#2ecc71'
         ))
-        # Add a line for total utility
         impact_fig.add_trace(go.Scatter(
-            x=[item['percentile']],
-            y=[item['total_utility']],
+            x=['Custom Scenario'],
+            y=[total_utility],
             name="Total Utility (with extras)",
             mode='markers',
             marker=dict(size=12, color='#e74c3c')
         ))
     
     impact_fig.update_layout(
-        title="Total Utility by Percentile (Utils)",
-        xaxis_title="Percentile",
+        title="Total Utility (Utils)",
         yaxis_title="Total Utility (Utils)",
         barmode='stack',
         legend=dict(
@@ -706,34 +1722,35 @@ def update_results(n_clicks, program_type, initial_investment,
     # Create dollars impact graph
     dollars_fig = go.Figure()
     
-    # Calculate total earnings gain across all percentiles
-    total_earnings_data = []
-    
-    for percentile in percentiles:
-        results = all_results[percentile]
-        # Calculate total earnings gain over all students
+    if simulation_mode == 'percentile':
+        for percentile in percentiles:
+            results = all_results[percentile]
+            
+            # Calculate total earnings gain
+            total_earnings_gain = results['student_metrics']['avg_earnings_gain'] * results['students_educated']
+            
+            dollars_fig.add_trace(go.Bar(
+                x=[percentile],
+                y=[total_earnings_gain],
+                name="Total Earnings Gain",
+                marker_color='#4CAF50'
+            ))
+    else:
+        results = all_results['Custom']
+        
+        # Calculate total earnings gain
         total_earnings_gain = results['student_metrics']['avg_earnings_gain'] * results['students_educated']
         
-        total_earnings_data.append({
-            'percentile': percentile.upper(),
-            'total_earnings_gain': total_earnings_gain,
-            'students_educated': results['students_educated']
-        })
-    
-    # Add total earnings gain bars
-    for item in total_earnings_data:
         dollars_fig.add_trace(go.Bar(
-            x=[item['percentile']],
-            y=[item['total_earnings_gain']],
+            x=['Custom Scenario'],
+            y=[total_earnings_gain],
             name="Total Earnings Gain",
             marker_color='#4CAF50'
         ))
     
     dollars_fig.update_layout(
-        title="Total Earnings Gain by Percentile (Dollars)",
-        xaxis_title="Percentile",
+        title="Total Earnings Gain (Dollars)",
         yaxis_title="Total Earnings Gain ($)",
-        barmode='group',
         legend=dict(
             orientation="h",
             yanchor="bottom",
@@ -746,22 +1763,40 @@ def update_results(n_clicks, program_type, initial_investment,
     # Create utility breakdown graph
     utility_fig = go.Figure()
     
-    for percentile in percentiles:
-        results = all_results[percentile]
+    if simulation_mode == 'percentile':
+        for percentile in percentiles:
+            results = all_results[percentile]
+            
+            utility_fig.add_trace(go.Bar(
+                x=[percentile],
+                y=[results['student_metrics']['avg_student_utility_gain']],
+                name="Student Utility" if percentile == percentiles[0] else None,
+                marker_color='#3498db',
+                showlegend=percentile == percentiles[0]
+            ))
+            utility_fig.add_trace(go.Bar(
+                x=[percentile],
+                y=[results['student_metrics']['avg_remittance_utility_gain']],
+                name="Remittance Utility" if percentile == percentiles[0] else None,
+                marker_color='#2ecc71',
+                showlegend=percentile == percentiles[0]
+            ))
+    else:
+        results = all_results['Custom']
+        
         utility_fig.add_trace(go.Bar(
-            x=[percentile.upper()],
+            x=['Custom Scenario'],
             y=[results['student_metrics']['avg_student_utility_gain']],
-            name=f"{percentile.upper()} Student Utility"
+            name="Student Utility"
         ))
         utility_fig.add_trace(go.Bar(
-            x=[percentile.upper()],
+            x=['Custom Scenario'],
             y=[results['student_metrics']['avg_remittance_utility_gain']],
-            name=f"{percentile.upper()} Remittance Utility"
+            name="Remittance Utility"
         ))
     
     utility_fig.update_layout(
-        title="Utility Breakdown by Percentile",
-        xaxis_title="Percentile",
+        title="Utility Breakdown per Student",
         yaxis_title="Utility",
         barmode='stack'
     )
@@ -769,301 +1804,107 @@ def update_results(n_clicks, program_type, initial_investment,
     # Create relative performance graph
     perf_fig = go.Figure()
     
-    for percentile in percentiles:
-        results = all_results[percentile]
+    if simulation_mode == 'percentile':
+        for percentile in percentiles:
+            results = all_results[percentile]
+            
+            perf_fig.add_trace(go.Bar(
+                x=[percentile],
+                y=[results['irr'] * 100],  # Convert to percentage
+                name="IRR (%)"
+            ))
+    else:
+        results = all_results['Custom']
+        
         perf_fig.add_trace(go.Bar(
-            x=[percentile.upper()],
+            x=['Custom Scenario'],
             y=[results['irr'] * 100],  # Convert to percentage
-            name=f"{percentile.upper()} IRR"
+            name="IRR (%)"
         ))
     
     perf_fig.update_layout(
-        title="IRR by Percentile",
-        xaxis_title="Percentile",
-        yaxis_title="IRR (%)",
-        barmode='group'
+        title="Internal Rate of Return (IRR)",
+        yaxis_title="IRR (%)"
     )
     
     # Create percentile comparison graph
     comparison_fig = go.Figure()
     
-    # Create a dual-axis figure
-    comparison_fig = make_subplots(specs=[[{"secondary_y": True}]])
-    
-    # Add IRR on primary y-axis
-    comparison_fig.add_trace(
-        go.Scatter(
-            x=[p.upper() for p in percentiles],
-            y=[all_results[p]['irr'] * 100 for p in percentiles],
-            name="IRR (%)",
-            line=dict(color='blue', width=3)
-        ),
-        secondary_y=False
-    )
-    
-    # Add earnings gain on secondary y-axis
-    comparison_fig.add_trace(
-        go.Scatter(
-            x=[p.upper() for p in percentiles],
-            y=[all_results[p]['student_metrics']['avg_earnings_gain'] for p in percentiles],
-            name="Avg Earnings Gain ($)",
-            line=dict(color='green', width=3)
-        ),
-        secondary_y=True
-    )
-    
-    comparison_fig.update_layout(
-        title="IRR vs. Earnings Gain by Percentile",
-        xaxis_title="Percentile"
-    )
-    
-    comparison_fig.update_yaxes(title_text="IRR (%)", secondary_y=False)
-    comparison_fig.update_yaxes(title_text="Avg Earnings Gain ($)", secondary_y=True)
+    if simulation_mode == 'percentile':
+        # Extract metrics for comparison
+        irr_values = [all_results[p]['irr'] * 100 for p in percentiles]
+        payment_cap_pct = [all_results[p]['contract_metrics'].get('payment_cap_exits', 0) / 
+                          all_results[p]['contract_metrics']['total_contracts'] * 100 
+                          if all_results[p]['contract_metrics']['total_contracts'] > 0 else 0 
+                          for p in percentiles]
+        student_utility = [all_results[p]['student_metrics']['avg_student_utility_gain'] for p in percentiles]
+        remittance_utility = [all_results[p]['student_metrics']['avg_remittance_utility_gain'] for p in percentiles]
+        
+        comparison_fig.add_trace(go.Scatter(
+            x=percentiles,
+            y=irr_values,
+            mode='lines+markers',
+            name='IRR (%)',
+            line=dict(color='#e74c3c', width=3)
+        ))
+        
+        comparison_fig.add_trace(go.Scatter(
+            x=percentiles,
+            y=payment_cap_pct,
+            mode='lines+markers',
+            name='Payment Cap %',
+            line=dict(color='#3498db', width=3)
+        ))
+        
+        comparison_fig.add_trace(go.Scatter(
+            x=percentiles,
+            y=student_utility,
+            mode='lines+markers',
+            name='Avg Student Utility',
+            line=dict(color='#2ecc71', width=3)
+        ))
+        
+        comparison_fig.add_trace(go.Scatter(
+            x=percentiles,
+            y=remittance_utility,
+            mode='lines+markers',
+            name='Avg Remittance Utility',
+            line=dict(color='#f39c12', width=3)
+        ))
+        
+        comparison_fig.update_layout(
+            title="Key Metrics Across Percentiles",
+            xaxis_title="Percentile",
+            yaxis_title="Value"
+        )
+    else:
+        # For custom mode, show key metrics as bars
+        results = all_results['Custom']
+        
+        # Create a bar chart showing key metrics
+        metrics = {
+            'IRR (%)': results['irr'] * 100,
+            'Payment Cap %': results['contract_metrics'].get('payment_cap_exits', 0) / 
+                           results['contract_metrics']['total_contracts'] * 100 
+                           if results['contract_metrics']['total_contracts'] > 0 else 0,
+            'Avg Student Utility': results['student_metrics']['avg_student_utility_gain'],
+            'Avg Remittance Utility': results['student_metrics']['avg_remittance_utility_gain']
+        }
+        
+        for metric, value in metrics.items():
+            comparison_fig.add_trace(go.Bar(
+                x=[metric],
+                y=[value],
+                name=metric
+            ))
+        
+        comparison_fig.update_layout(
+            title="Key Performance Metrics",
+            barmode='group'
+        )
     
     return summary_table, tables_div, impact_fig, dollars_fig, utility_fig, perf_fig, comparison_fig, cash_flow_table
 
-# Add a callback to update the calculated students display
-@app.callback(
-    Output('calculated-students', 'children'),
-    [Input('program-type', 'value'),
-     Input('initial-investment', 'value')]
-)
-def update_calculated_students(program_type, initial_investment):
-    if not initial_investment:
-        return "Please enter an initial investment amount"
-    
-    # Get price per student based on program type
-    if program_type == 'University':
-        price_per_student = 29000
-        program_name = 'Uganda'
-    elif program_type == 'Nurse':
-        price_per_student = 16650
-        program_name = 'Kenya'
-    elif program_type == 'Trade':
-        price_per_student = 15000
-        program_name = 'Rwanda'
-    else:
-        return "Invalid program type"
-    
-    # Calculate number of students (reserving 2% for cash buffer)
-    available_for_students = initial_investment * 0.98
-    initial_students = int(available_for_students / price_per_student)
-    
-    return html.Div([
-        html.P(f"{program_name} Program - Price per student: ${price_per_student:,.2f}", style={'marginBottom': '5px'}),
-        html.P(f"Initial students that can be funded: {initial_students}", style={'fontWeight': 'bold'})
-    ])
-
-def create_degree_params(percentile, program_type='Nurse'):
-    """Create degree parameters based on percentile scenario."""
-    # Set degree distribution based on percentile
-    
-    if program_type == 'Nurse':  # Kenya program
-        # Nurse program distributions
-        if percentile == 'p10':
-            nurse_pct = 0.13
-            asst_pct = 0.22  # Reduced from 0.32
-            asst_shift_pct = 0.10  # Add ASST_SHIFT (moved from asst_pct)
-            na_pct = 0.55
-        elif percentile == 'p25':
-            nurse_pct = 0.20
-            asst_pct = 0.30  # Reduced from 0.45
-            asst_shift_pct = 0.15  # Add ASST_SHIFT (33% of original 0.45)
-            na_pct = 0.35
-        elif percentile == 'p50':
-            nurse_pct = 0.30
-            asst_pct = 0.40  # Reduced from 0.60
-            asst_shift_pct = 0.20  # Add ASST_SHIFT (33% of original 0.60)
-            na_pct = 0.1
-        elif percentile == 'p75':
-            nurse_pct = 0.45
-            asst_pct = 0.37  # Reduced from 0.55
-            asst_shift_pct = 0.18  # Add ASST_SHIFT (33% of original 0.55)
-            na_pct = 0.0
-        elif percentile == 'p90':
-            nurse_pct = 0.60
-            asst_pct = 0.27  # Reduced from 0.40
-            asst_shift_pct = 0.13  # Add ASST_SHIFT (33% of original 0.40)
-            na_pct = 0.00
-        else:
-            # Default to median
-            nurse_pct = 0.30
-            asst_pct = 0.40  # Reduced from 0.55
-            asst_shift_pct = 0.15  # Add ASST_SHIFT (33% of original 0.55)
-            na_pct = 0.15
-            
-        return [
-            (DegreeParams(
-                name='NURSE',
-                initial_salary=40000,
-                salary_std=4000,
-                annual_growth=0.02,
-                years_to_complete=4,
-                home_prob=0.1
-            ), nurse_pct),
-            (DegreeParams(
-                name='ASST',
-                initial_salary=31500,
-                salary_std=2800,
-                annual_growth=0.005,
-                years_to_complete=3,
-                home_prob=0.1
-            ), asst_pct),
-            (DegreeParams(
-                name='ASST_SHIFT',
-                initial_salary=31500,
-                salary_std=2800,
-                annual_growth=0.005,
-                years_to_complete=6,  # 6 years to complete
-                home_prob=0.1
-            ), asst_shift_pct),
-            (DegreeParams(
-                name='NA',
-                initial_salary=2200,
-                salary_std=640,
-                annual_growth=0.01,
-                years_to_complete=2,
-                home_prob=1.0
-            ), na_pct)
-        ]
-    
-    elif program_type == 'Trade':  # Rwanda program
-        # Trade program distributions
-        if percentile == 'p10':
-            trade_pct = 0.20
-            asst_pct = 0.17  # Reduced from 0.25
-            asst_shift_pct = 0.08  # Add ASST_SHIFT (33% of original 0.25)
-            na_pct = 0.55
-        elif percentile == 'p25':
-            trade_pct = 0.20
-            asst_pct = 0.30  # Reduced from 0.45
-            asst_shift_pct = 0.15  # Add ASST_SHIFT (33% of original 0.45)
-            na_pct = 0.35
-        elif percentile == 'p50':
-            trade_pct = 0.40
-            asst_pct = 0.30  # Reduced from 0.45
-            asst_shift_pct = 0.15  # Add ASST_SHIFT (33% of original 0.45)
-            na_pct = 0.15
-        elif percentile == 'p75':
-            trade_pct = 0.5
-            asst_pct = 0.33  # Reduced from 0.5
-            asst_shift_pct = 0.17  # Add ASST_SHIFT (33% of original 0.5)
-            na_pct = 0.0
-        elif percentile == 'p90':
-            trade_pct = 0.75
-            asst_pct = 0.17  # Reduced from 0.25
-            asst_shift_pct = 0.08  # Add ASST_SHIFT (33% of original 0.25)
-            na_pct = 0.00
-        else:
-            # Default to median
-            trade_pct = 0.40
-            asst_pct = 0.27  # Reduced from 0.40
-            asst_shift_pct = 0.13  # Add ASST_SHIFT (33% of original 0.40)
-            na_pct = 0.20
-            
-        return [
-            (DegreeParams(
-                name='TRADE',
-                initial_salary=35000,
-                salary_std=3000,
-                annual_growth=0.02,
-                years_to_complete=3,
-                home_prob=0.1
-            ), trade_pct),
-            (DegreeParams(
-                name='ASST',
-                initial_salary=31500,
-                salary_std=2800,
-                annual_growth=0.005,
-                years_to_complete=3,
-                home_prob=0.1
-            ), asst_pct),
-            (DegreeParams(
-                name='ASST_SHIFT',
-                initial_salary=31500,
-                salary_std=2800,
-                annual_growth=0.005,
-                years_to_complete=6,  # 6 years to complete
-                home_prob=0.1
-            ), asst_shift_pct),
-            (DegreeParams(
-                name='NA',
-                initial_salary=2200,
-                salary_std=640,
-                annual_growth=0.01,
-                years_to_complete=2,
-                home_prob=1.0
-            ), na_pct)
-        ]
-    
-    else:  # University program (Uganda program)
-        if percentile == 'p10':
-            ba_pct = 0.20
-            ma_pct = 0.10
-            asst_shift_pct = 0.30  # This replaces ASST completely
-            na_pct = 0.4
-        elif percentile == 'p25':
-            ba_pct = 0.32
-            ma_pct = 0.11
-            asst_shift_pct = 0.42  # This replaces ASST completely
-            na_pct = 0.15
-        elif percentile == 'p50':
-            ba_pct = 0.45
-            ma_pct = 0.24
-            asst_shift_pct = 0.27  # This replaces ASST completely
-            na_pct = 0.04
-        elif percentile == 'p75':
-            ba_pct = 0.55
-            ma_pct = 0.28
-            asst_shift_pct = 0.15  # This replaces ASST completely
-            na_pct = 0.02
-        elif percentile == 'p90':
-            ba_pct = 0.63
-            ma_pct = 0.33
-            asst_shift_pct = 0.02  # This replaces ASST completely
-            na_pct = 0.02
-        else:
-            # Default to median
-            ba_pct = 0.45
-            ma_pct = 0.24
-            asst_shift_pct = 0.27  # This replaces ASST completely
-            na_pct = 0.04
-        
-        return [
-            (DegreeParams(
-                name='BA',
-                initial_salary=41300,
-                salary_std=6000,
-                annual_growth=0.03,
-                years_to_complete=4,
-                home_prob=0.1
-            ), ba_pct),
-            (DegreeParams(
-                name='MA',
-                initial_salary=46709,
-                salary_std=6600,
-                annual_growth=0.04,
-                years_to_complete=6,
-                home_prob=0.1
-            ), ma_pct),
-            (DegreeParams(
-                name='ASST_SHIFT',
-                initial_salary=31500,
-                salary_std=2800,
-                annual_growth=0.005,
-                years_to_complete=6,  # 6 years to complete
-                home_prob=0.1
-            ), asst_shift_pct),
-            (DegreeParams(
-                name='NA',
-                initial_salary=2200,
-                salary_std=640,
-                annual_growth=0.01,
-                years_to_complete=2,
-                home_prob=1.0
-            ), na_pct)
-        ]
-
 # Run the app
 if __name__ == '__main__':
-    app.run(debug=True) 
+    app.run(debug=True, port=8051) 
