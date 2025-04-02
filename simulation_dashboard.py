@@ -1074,6 +1074,152 @@ dashboard_layout = html.Div([
                                     ])
                                 ], style={'padding': '10px', 'backgroundColor': '#f9f9f9', 'borderRadius': '5px', 'marginBottom': '15px'}),
                                 html.Div(id='yearly-cash-flow-table')
+                            ]),
+                            dcc.Tab(label='GiveWell Comparison', children=[
+                                html.Div([
+                                    html.H4("GiveDirectly Cash Transfer Comparison"),
+                                    html.P([
+                                        "This section compares the impact of a $1,000,000 donation to GiveDirectly's Cash for Poverty Relief program across different countries. ",
+                                        "The data is based on GiveWell's latest cost-effectiveness analysis showing how $1 million would create value in different dimensions. ",
+                                        "This provides a benchmark for comparing our program's impact against a proven effective intervention."
+                                    ])
+                                ], style={'padding': '10px', 'backgroundColor': '#f9f9f9', 'borderRadius': '5px', 'marginBottom': '15px'}),
+                                
+                                # GiveWell cash transfer data table
+                                html.Div([
+                                    html.H4("$1M to GiveDirectly: Cost-Effectiveness Analysis (CEA)"),
+                                    html.P("Breakdown of bottom-line value from GiveWell's latest analysis of GiveDirectly's Cash for Poverty Relief program"),
+                                    
+                                    # Create the table using dash_table
+                                    dash_table.DataTable(
+                                        id='givewell-table',
+                                        columns=[
+                                            {"name": "Impact Category", "id": "category"},
+                                            {"name": "Kenya", "id": "kenya"},
+                                            {"name": "Malawi", "id": "malawi"},
+                                            {"name": "Mozambique", "id": "mozambique"},
+                                            {"name": "Rwanda", "id": "rwanda"},
+                                            {"name": "Uganda", "id": "uganda"},
+                                        ],
+                                        data=[
+                                            {"category": "Consumption benefits to recipients", "kenya": 4196, "malawi": 6746, "mozambique": 6095, "rwanda": 5736, "uganda": 4517},
+                                            {"category": "Spillover benefits to non-recipients", "kenya": 2833, "malawi": 3985, "mozambique": 3600, "rwanda": 3630, "uganda": 2859},
+                                            {"category": "Mortality benefits", "kenya": 1065, "malawi": 1131, "mozambique": 1739, "rwanda": 856, "uganda": 1188},
+                                            {"category": "Additional benefits and downsides", "kenya": 648, "malawi": 949, "mozambique": 915, "rwanda": 818, "uganda": 685},
+                                            {"category": "Total units of value", "kenya": 8742, "malawi": 12810, "mozambique": 12349, "rwanda": 11040, "uganda": 9249},
+                                            {"category": "Units of value per $", "kenya": 0.009, "malawi": 0.013, "mozambique": 0.012, "rwanda": 0.011, "uganda": 0.009},
+                                        ],
+                                        style_cell={'textAlign': 'center'},
+                                        style_header={
+                                            'backgroundColor': 'rgb(230, 230, 230)',
+                                            'fontWeight': 'bold'
+                                        },
+                                        style_data_conditional=[
+                                            {
+                                                'if': {'row_index': 4},
+                                                'backgroundColor': 'rgba(0, 128, 0, 0.1)',
+                                                'fontWeight': 'bold'
+                                            },
+                                            {
+                                                'if': {'row_index': 5},
+                                                'backgroundColor': 'rgba(0, 128, 0, 0.1)',
+                                                'fontWeight': 'bold'
+                                            }
+                                        ]
+                                    ),
+                                    
+                                    html.Div([
+                                        html.H4("Percentage Breakdown", style={'marginTop': '20px'}),
+                                        dash_table.DataTable(
+                                            id='givewell-percentage-table',
+                                            columns=[
+                                                {"name": "Impact Category", "id": "category"},
+                                                {"name": "Kenya", "id": "kenya"},
+                                                {"name": "Malawi", "id": "malawi"},
+                                                {"name": "Mozambique", "id": "mozambique"},
+                                                {"name": "Rwanda", "id": "rwanda"},
+                                                {"name": "Uganda", "id": "uganda"},
+                                            ],
+                                            data=[
+                                                {"category": "Consumption benefits to recipients", "kenya": "48%", "malawi": "53%", "mozambique": "49%", "rwanda": "52%", "uganda": "49%"},
+                                                {"category": "Spillover benefits to non-recipients", "kenya": "32%", "malawi": "31%", "mozambique": "29%", "rwanda": "33%", "uganda": "31%"},
+                                                {"category": "Mortality benefits", "kenya": "12%", "malawi": "9%", "mozambique": "14%", "rwanda": "8%", "uganda": "13%"},
+                                                {"category": "Additional benefits and downsides", "kenya": "7%", "malawi": "7%", "mozambique": "7%", "rwanda": "7%", "uganda": "7%"},
+                                            ],
+                                            style_cell={'textAlign': 'center'},
+                                            style_header={
+                                                'backgroundColor': 'rgb(230, 230, 230)',
+                                                'fontWeight': 'bold'
+                                            }
+                                        )
+                                    ]),
+                                    
+                                    # Add visualization of the GiveWell data
+                                    html.Div([
+                                        html.H4("Value Distribution by Country", style={'marginTop': '30px'}),
+                                        dcc.Graph(
+                                            id='givewell-bar-chart',
+                                            figure={
+                                                'data': [
+                                                    {
+                                                        'x': ['Kenya', 'Malawi', 'Mozambique', 'Rwanda', 'Uganda'],
+                                                        'y': [4196, 6746, 6095, 5736, 4517],
+                                                        'type': 'bar',
+                                                        'name': 'Consumption benefits',
+                                                        'marker': {'color': '#3498db'}
+                                                    },
+                                                    {
+                                                        'x': ['Kenya', 'Malawi', 'Mozambique', 'Rwanda', 'Uganda'],
+                                                        'y': [2833, 3985, 3600, 3630, 2859],
+                                                        'type': 'bar',
+                                                        'name': 'Spillover benefits',
+                                                        'marker': {'color': '#2ecc71'}
+                                                    },
+                                                    {
+                                                        'x': ['Kenya', 'Malawi', 'Mozambique', 'Rwanda', 'Uganda'],
+                                                        'y': [1065, 1131, 1739, 856, 1188],
+                                                        'type': 'bar',
+                                                        'name': 'Mortality benefits',
+                                                        'marker': {'color': '#e74c3c'}
+                                                    },
+                                                    {
+                                                        'x': ['Kenya', 'Malawi', 'Mozambique', 'Rwanda', 'Uganda'],
+                                                        'y': [648, 949, 915, 818, 685],
+                                                        'type': 'bar',
+                                                        'name': 'Additional benefits',
+                                                        'marker': {'color': '#f39c12'}
+                                                    }
+                                                ],
+                                                'layout': {
+                                                    'title': 'Value Distribution of $1M Donation to GiveDirectly by Country',
+                                                    'barmode': 'stack',
+                                                    'xaxis': {'title': 'Country'},
+                                                    'yaxis': {'title': 'Units of Value'}
+                                                }
+                                            }
+                                        )
+                                    ]),
+                                    
+                                    # Add direct comparison chart (dynamically updated with simulation results)
+                                    html.Div([
+                                        html.H4("Direct Comparison: ISA Program vs GiveDirectly", style={'marginTop': '30px'}),
+                                        html.P("This chart compares the total utility value generated by our program versus GiveDirectly's Cash for Poverty Relief program for a $1M donation."),
+                                        dcc.Graph(id='isa-vs-givedirectly-chart')
+                                    ]),
+                                    
+                                    html.Div([
+                                        html.H4("Notes on GiveWell's Cost-Effectiveness Analysis", style={'marginTop': '20px'}),
+                                        html.P([
+                                            "The units of value in GiveWell's analysis represent welfare benefits, adjusted with moral weights. ",
+                                            "A key benchmark is that GiveWell typically considers a program to be cost-effective if it achieves 10x the value per dollar compared to direct cash transfers. ",
+                                            "The values shown for GiveDirectly represent what $1 million would achieve if donated directly to their Cash for Poverty Relief program."
+                                        ]),
+                                        html.P([
+                                            "Source: GiveWell's 2024 cost-effectiveness analysis of GiveDirectly's Cash for Poverty Relief program. ",
+                                            html.A("Link to GiveWell's analysis", href="https://www.givewell.org/international/technical/programs/givedirectly-cash-for-poverty-relief-program", target="_blank")
+                                        ])
+                                    ], style={'backgroundColor': '#f5f5f5', 'padding': '15px', 'borderRadius': '5px', 'marginTop': '20px'})
+                                ])
                             ])
                         ])
                     ])
@@ -1446,7 +1592,8 @@ def toggle_custom_weights(mode):
      Output('relative-performance-graph', 'figure'),
      Output('percentile-comparison-graph', 'figure'),
      Output('yearly-cash-flow-table', 'children'),
-     Output('loading-simulation', 'parent_className')],  # Added for loading spinner
+     Output('loading-simulation', 'parent_className'),
+     Output('isa-vs-givedirectly-chart', 'figure')],  # Added output for GiveDirectly comparison
     [Input('run-button', 'n_clicks')],
     [State('program-type', 'value'),
      State('initial-investment', 'value'),
@@ -1461,7 +1608,7 @@ def update_results(n_clicks, program_type, initial_investment,
                   home_prob, unemployment_rate, inflation_rate,
                   stored_weights, simulation_mode):
     if n_clicks == 0:
-        return dash.no_update, dash.no_update, dash.no_update, dash.no_update, dash.no_update, dash.no_update, dash.no_update, dash.no_update, dash.no_update
+        return dash.no_update, dash.no_update, dash.no_update, dash.no_update, dash.no_update, dash.no_update, dash.no_update, dash.no_update, dash.no_update, dash.no_update
     
     # Get weights from stored weights
     stored_weights = stored_weights or {}
@@ -2137,7 +2284,106 @@ def update_results(n_clicks, program_type, initial_investment,
             barmode='group'
         )
     
-    return summary_table, tables_div, impact_fig, dollars_fig, utility_fig, perf_fig, comparison_fig, cash_flow_table, 'loading-simulation'
+    # Create ISA vs GiveDirectly comparison chart
+    # Define GiveDirectly country data
+    givedirectly_data = {
+        'Kenya': 8742,
+        'Malawi': 12810,
+        'Mozambique': 12349,
+        'Rwanda': 11040,
+        'Uganda': 9249
+    }
+    
+    # Prepare ISA program data - get total utility
+    if simulation_mode == 'percentile':
+        # Use median (p50) scenario for comparison
+        p50_results = all_results['p50']
+        isa_total_utility = p50_results['student_metrics']['avg_total_utility_gain_with_extras'] * p50_results['students_educated']
+        isa_program_name = f"{program_type} Program (P50)"
+    else:
+        # Use custom scenario for comparison
+        custom_results = all_results['Custom']
+        isa_total_utility = custom_results['student_metrics']['avg_total_utility_gain_with_extras'] * custom_results['students_educated']
+        isa_program_name = f"{program_type} Program (Custom)"
+    
+    # Create the comparison figure
+    comparison_data = []
+    
+    # Add ISA Program bar
+    comparison_data.append(
+        go.Bar(
+            x=[isa_program_name],
+            y=[isa_total_utility],
+            name=isa_program_name,
+            marker_color='#9b59b6'
+        )
+    )
+    
+    # Add GiveDirectly bars for each country
+    for country, value in givedirectly_data.items():
+        comparison_data.append(
+            go.Bar(
+                x=[f'GiveDirectly ({country})'],
+                y=[value],
+                name=f'GiveDirectly ({country})',
+                marker_color={
+                    'Kenya': '#3498db',
+                    'Malawi': '#2ecc71',
+                    'Mozambique': '#e74c3c',
+                    'Rwanda': '#f39c12',
+                    'Uganda': '#1abc9c'
+                }[country]
+            )
+        )
+    
+    # Create the figure layout
+    isa_vs_givedirectly_fig = go.Figure(data=comparison_data)
+    isa_vs_givedirectly_fig.update_layout(
+        title=f"ISA Program vs GiveDirectly: Total Utility from $1M Donation",
+        yaxis_title="Total Utility (Utils)",
+        xaxis_title="Program",
+        legend_title="Program Type",
+        barmode='group'
+    )
+    
+    # Add a horizontal line showing 10x GiveDirectly benchmark
+    # Calculate the appropriate 10x benchmark based on program type and country
+    benchmark_country = 'Kenya'  # Default to Kenya
+    if program_type == 'University':  # Uganda program
+        benchmark_country = 'Uganda'
+    elif program_type == 'Nurse':     # Kenya program
+        benchmark_country = 'Kenya'
+    elif program_type == 'Trade':     # Rwanda program
+        benchmark_country = 'Rwanda'
+    
+    benchmark_value = givedirectly_data[benchmark_country] * 10
+    
+    isa_vs_givedirectly_fig.add_shape(
+        type="line",
+        x0=-0.5,
+        y0=benchmark_value,
+        x1=len(comparison_data) - 0.5,
+        y1=benchmark_value,
+        line=dict(
+            color="red",
+            width=2,
+            dash="dash",
+        )
+    )
+    
+    # Add annotation for the benchmark line
+    isa_vs_givedirectly_fig.add_annotation(
+        x=len(comparison_data) - 1,
+        y=benchmark_value * 1.05,
+        text=f"10x {benchmark_country} Benchmark",
+        showarrow=False,
+        font=dict(
+            color="red",
+            size=12
+        )
+    )
+    
+    return summary_table, tables_div, impact_fig, dollars_fig, utility_fig, perf_fig, comparison_fig, cash_flow_table, 'loading-simulation', isa_vs_givedirectly_fig
 
 # Run the app
 if __name__ == '__main__':
