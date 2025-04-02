@@ -471,7 +471,7 @@ def update_calculated_students(program_type):
         price_per_student = 16650
         program_name = 'Kenya'
     elif program_type == 'Trade':
-        price_per_student = 15000
+        price_per_student = 16650
         program_name = 'Rwanda'
     else:
         return "Invalid program type"
@@ -707,7 +707,7 @@ def create_degree_params(percentile, program_type):
                     annual_growth=0.03,
                     years_to_complete=4,
                     home_prob=0.1
-                ), 0.55),
+                ), 0.50),
                 (DegreeParams(
                     name='MA',
                     initial_salary=46709,
@@ -715,7 +715,7 @@ def create_degree_params(percentile, program_type):
                     annual_growth=0.04,
                     years_to_complete=6,
                     home_prob=0.1
-                ), 0.35),
+                ), 0.30),
                 (DegreeParams(
                     name='ASST_SHIFT',
                     initial_salary=31500,
@@ -723,7 +723,7 @@ def create_degree_params(percentile, program_type):
                     annual_growth=0.005,
                     years_to_complete=6,
                     home_prob=0.1
-                ), 0.08),
+                ), 0.18),
                 (DegreeParams(
                     name='NA',
                     initial_salary=2200,
@@ -779,7 +779,7 @@ def create_degree_params(percentile, program_type):
                     annual_growth=0.02,
                     years_to_complete=4,
                     home_prob=0.1
-                ), 0.15),
+                ), 0.12),
                 (DegreeParams(
                     name='ASST',
                     initial_salary=31500,
@@ -787,7 +787,7 @@ def create_degree_params(percentile, program_type):
                     annual_growth=0.005,
                     years_to_complete=3,
                     home_prob=0.1
-                ), 0.20),
+                ), 0.13),
                 (DegreeParams(
                     name='ASST_SHIFT',
                     initial_salary=31500,
@@ -795,7 +795,7 @@ def create_degree_params(percentile, program_type):
                     annual_growth=0.005,
                     years_to_complete=6,
                     home_prob=0.1
-                ), 0.25),
+                ), 0.20),
                 (DegreeParams(
                     name='NA',
                     initial_salary=2200,
@@ -803,7 +803,7 @@ def create_degree_params(percentile, program_type):
                     annual_growth=0.01,
                     years_to_complete=2,
                     home_prob=1.0
-                ), 0.40)
+                ), 0.55)
             ]
         elif percentile == 'p25':
             return [
@@ -956,7 +956,7 @@ def create_degree_params(percentile, program_type):
                     annual_growth=0.02,
                     years_to_complete=3,
                     home_prob=0.1
-                ), 0.20),
+                ), 0.17),
                 (DegreeParams(
                     name='ASST',
                     initial_salary=31500,
@@ -964,7 +964,7 @@ def create_degree_params(percentile, program_type):
                     annual_growth=0.005,
                     years_to_complete=3,
                     home_prob=0.1
-                ), 0.15),
+                ), 0.13),
                 (DegreeParams(
                     name='ASST_SHIFT',
                     initial_salary=31500,
@@ -972,7 +972,7 @@ def create_degree_params(percentile, program_type):
                     annual_growth=0.005,
                     years_to_complete=6,
                     home_prob=0.1
-                ), 0.25),
+                ), 0.15),
                 (DegreeParams(
                     name='NA',
                     initial_salary=2200,
@@ -980,7 +980,7 @@ def create_degree_params(percentile, program_type):
                     annual_growth=0.01,
                     years_to_complete=2,
                     home_prob=1.0
-                ), 0.40)
+                ), 0.55)
             ]
         elif percentile == 'p25':
             return [
@@ -1324,6 +1324,46 @@ def update_results(n_clicks, program_type, initial_investment,
     home_prob = home_prob / 100
     unemployment_rate = unemployment_rate / 100
     inflation_rate = inflation_rate / 100
+    
+    # Initialize ISA parameters
+    isa_percentage = None
+    isa_cap = None
+    isa_threshold = None
+    price_per_student = None
+    
+    # Set defaults based on program type
+    if isa_percentage is None:
+        if program_type == 'University':  # Uganda program
+            isa_percentage = 0.14
+        elif program_type == 'Nurse':     # Kenya program
+            isa_percentage = 0.12
+        elif program_type == 'Trade':     # Rwanda program
+            isa_percentage = 0.12
+        else:
+            isa_percentage = 0.12
+    
+    if isa_cap is None:
+        if program_type == 'University':  # Uganda program
+            isa_cap = 72500
+        elif program_type == 'Nurse':     # Kenya program
+            isa_cap = 49950
+        elif program_type == 'Trade':     # Rwanda program
+            isa_cap = 45000
+        else:
+            isa_cap = 50000
+    
+    if price_per_student is None:
+        if program_type == 'University':  # Uganda program
+            price_per_student = 29000
+        elif program_type == 'Nurse':     # Kenya program
+            price_per_student = 16650
+        elif program_type == 'Trade':     # Rwanda program
+            price_per_student = 16650
+        else:
+            raise ValueError("Program type must be 'University' (Uganda), 'Nurse' (Kenya), or 'Trade' (Rwanda)")
+        
+    if isa_threshold is None:
+        isa_threshold = 27000
     
     # Different simulation modes
     if simulation_mode == 'percentile':

@@ -717,7 +717,7 @@ def simulate_impact(
         elif program_type == 'Nurse':     # Kenya program
             price_per_student = 16650
         elif program_type == 'Trade':     # Rwanda program
-            price_per_student = 15000
+            price_per_student = 16650
         else:
             raise ValueError("Program type must be 'University' (Uganda), 'Nurse' (Kenya), or 'Trade' (Rwanda)")
     
@@ -1029,7 +1029,7 @@ def run_impact_simulation(
         elif program_type == 'Nurse':     # Kenya program
             price_per_student = 16650
         elif program_type == 'Trade':     # Rwanda program
-            price_per_student = 15000
+            price_per_student = 16650
         else:
             raise ValueError("Program type must be 'University' (Uganda), 'Nurse' (Kenya), or 'Trade' (Rwanda)")
         
@@ -1343,7 +1343,7 @@ def main():
         price_per_student = 16650
         program_display_name = 'Kenya'
     elif args.program == 'Trade':
-        price_per_student = 15000
+        price_per_student = 16650
         program_display_name = 'Rwanda'
     else:
         raise ValueError("Program type must be 'University' (Uganda), 'Nurse' (Kenya), or 'Trade' (Rwanda)")
