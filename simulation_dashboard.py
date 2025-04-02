@@ -1031,28 +1031,6 @@ dashboard_layout = html.Div([
                                 ], style={'padding': '10px', 'backgroundColor': '#f9f9f9', 'borderRadius': '5px', 'marginBottom': '15px'}),
                                 dcc.Graph(id='dollars-impact-graph')
                             ]),
-                            dcc.Tab(label='Relative Performance', children=[
-                                html.Div([
-                                    html.H4("Understanding Relative Performance"),
-                                    html.P([
-                                        "This graph compares the performance of different percentile scenarios relative to each other. ",
-                                        "It helps identify which scenarios meet GiveWell's cost-effectiveness threshold of 10x cash transfers, ",
-                                        "and under what conditions the program becomes self-sustaining."
-                                    ])
-                                ], style={'padding': '10px', 'backgroundColor': '#f9f9f9', 'borderRadius': '5px', 'marginBottom': '15px'}),
-                                dcc.Graph(id='relative-performance-graph')
-                            ]),
-                            dcc.Tab(label='Percentile Comparison', children=[
-                                html.Div([
-                                    html.H4("Understanding Percentile Comparison"),
-                                    html.P([
-                                        "This graph compares key metrics across different percentile scenarios. ",
-                                        "It helps visualize the range of possible outcomes and identify which factors are most sensitive to student success rates. ",
-                                        "This is particularly important for assessing the robustness of the program under different assumptions."
-                                    ])
-                                ], style={'padding': '10px', 'backgroundColor': '#f9f9f9', 'borderRadius': '5px', 'marginBottom': '15px'}),
-                                dcc.Graph(id='percentile-comparison-graph')
-                            ]),
                             dcc.Tab(label='Yearly Cash Flow', children=[
                                 html.Div([
                                     html.H4("Understanding Yearly Cash Flow"),
@@ -1577,11 +1555,9 @@ def toggle_custom_weights(mode):
      Output('percentile-tables', 'children'),
      Output('impact-metrics-graph', 'figure'),
      Output('dollars-impact-graph', 'figure'),
-     Output('relative-performance-graph', 'figure'),
-     Output('percentile-comparison-graph', 'figure'),
      Output('yearly-cash-flow-table', 'children'),
      Output('loading-simulation', 'parent_className'),
-     Output('isa-vs-givedirectly-chart', 'figure')],  # Added output for GiveDirectly comparison
+     Output('isa-vs-givedirectly-chart', 'figure')],
     [Input('run-button', 'n_clicks')],
     [State('program-type', 'value'),
      State('initial-investment', 'value'),
@@ -1596,7 +1572,7 @@ def update_results(n_clicks, program_type, initial_investment,
                   home_prob, unemployment_rate, inflation_rate,
                   stored_weights, simulation_mode):
     if n_clicks == 0:
-        return dash.no_update, dash.no_update, dash.no_update, dash.no_update, dash.no_update, dash.no_update, dash.no_update, dash.no_update, dash.no_update
+        return dash.no_update, dash.no_update, dash.no_update, dash.no_update, dash.no_update, dash.no_update, dash.no_update
     
     # Get weights from stored weights
     stored_weights = stored_weights or {}
@@ -2129,108 +2105,6 @@ def update_results(n_clicks, program_type, initial_investment,
         )
     )
     
-    # Create relative performance graph
-    perf_fig = go.Figure()
-    
-    if simulation_mode == 'percentile':
-        for percentile in percentiles:
-            results = all_results[percentile]
-            
-            perf_fig.add_trace(go.Bar(
-                x=[percentile],
-                y=[results['irr'] * 100],  # Convert to percentage
-                name="IRR (%)"
-            ))
-    else:
-        results = all_results['Custom']
-        
-        perf_fig.add_trace(go.Bar(
-            x=['Custom Scenario'],
-            y=[results['irr'] * 100],  # Convert to percentage
-            name="IRR (%)"
-        ))
-    
-    perf_fig.update_layout(
-        title="Internal Rate of Return (IRR)",
-        yaxis_title="IRR (%)"
-    )
-    
-    # Create percentile comparison graph
-    comparison_fig = go.Figure()
-    
-    if simulation_mode == 'percentile':
-        # Extract metrics for comparison
-        irr_values = [all_results[p]['irr'] * 100 for p in percentiles]
-        payment_cap_pct = [all_results[p]['contract_metrics'].get('payment_cap_exits', 0) / 
-                          all_results[p]['contract_metrics']['total_contracts'] * 100 
-                          if all_results[p]['contract_metrics']['total_contracts'] > 0 else 0 
-                          for p in percentiles]
-        student_utility = [all_results[p]['student_metrics']['avg_student_utility_gain'] for p in percentiles]
-        remittance_utility = [all_results[p]['student_metrics']['avg_remittance_utility_gain'] for p in percentiles]
-        
-        comparison_fig.add_trace(go.Scatter(
-            x=percentiles,
-            y=irr_values,
-            mode='lines+markers',
-            name='IRR (%)',
-            line=dict(color='#e74c3c', width=3)
-        ))
-        
-        comparison_fig.add_trace(go.Scatter(
-            x=percentiles,
-            y=payment_cap_pct,
-            mode='lines+markers',
-            name='Payment Cap %',
-            line=dict(color='#3498db', width=3)
-        ))
-        
-        comparison_fig.add_trace(go.Scatter(
-            x=percentiles,
-            y=student_utility,
-            mode='lines+markers',
-            name='Avg Student Utility',
-            line=dict(color='#2ecc71', width=3)
-        ))
-        
-        comparison_fig.add_trace(go.Scatter(
-            x=percentiles,
-            y=remittance_utility,
-            mode='lines+markers',
-            name='Avg Remittance Utility',
-            line=dict(color='#f39c12', width=3)
-        ))
-        
-        comparison_fig.update_layout(
-            title="Key Metrics Across Percentiles",
-            xaxis_title="Percentile",
-            yaxis_title="Value"
-        )
-    else:
-        # For custom mode, show key metrics as bars
-        results = all_results['Custom']
-        
-        # Create a bar chart showing key metrics
-        metrics = {
-            'IRR (%)': results['irr'] * 100,
-            'Payment Cap %': results['contract_metrics'].get('payment_cap_exits', 0) / 
-                           results['contract_metrics']['total_contracts'] * 100 
-                           if results['contract_metrics']['total_contracts'] > 0 else 0,
-            'Avg Student Utility': results['student_metrics']['avg_student_utility_gain'],
-            'Avg Remittance Utility': results['student_metrics']['avg_remittance_utility_gain']
-        }
-        
-        for metric, value in metrics.items():
-            comparison_fig.add_trace(go.Bar(
-                x=[metric],
-                y=[value],
-                name=metric
-            ))
-        
-        comparison_fig.update_layout(
-            title="Key Performance Metrics",
-            barmode='group'
-        )
-    
     # Create ISA vs GiveDirectly comparison chart
     # Define GiveDirectly country data
     givedirectly_data = {
@@ -2330,7 +2204,7 @@ def update_results(n_clicks, program_type, initial_investment,
         )
     )
     
-    return summary_table, tables_div, impact_fig, dollars_fig, perf_fig, comparison_fig, cash_flow_table, 'loading-simulation', isa_vs_givedirectly_fig
+    return summary_table, tables_div, impact_fig, dollars_fig, cash_flow_table, 'loading-simulation', isa_vs_givedirectly_fig
 
 # Run the app
 if __name__ == '__main__':
