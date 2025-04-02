@@ -862,8 +862,8 @@ def create_degree_params(percentile, program_type='Nurse'):
         # Nurse program distributions
         if percentile == 'p10':
             nurse_pct = 0.13
-            asst_pct = 0.32
-            asst_shift_pct = 0.0  # Add ASST_SHIFT
+            asst_pct = 0.22  # Reduced from 0.32
+            asst_shift_pct = 0.10  # Add ASST_SHIFT (moved from asst_pct)
             na_pct = 0.55
         elif percentile == 'p25':
             nurse_pct = 0.20
@@ -1013,9 +1013,9 @@ def create_degree_params(percentile, program_type='Nurse'):
             asst_shift_pct = 0.27  # This replaces ASST completely
             na_pct = 0.04
         elif percentile == 'p75':
-            ba_pct = 0.63
-            ma_pct = 0.33
-            asst_shift_pct = 0.02  # This replaces ASST completely
+            ba_pct = 0.55
+            ma_pct = 0.28
+            asst_shift_pct = 0.15  # This replaces ASST completely
             na_pct = 0.02
         elif percentile == 'p90':
             ba_pct = 0.63
