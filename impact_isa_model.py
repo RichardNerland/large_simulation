@@ -524,6 +524,7 @@ def calculate_student_statistics(student: Student, num_years: int, remittance_ra
     
     # PPP-adjusted earnings gain (based on undiscounted lifetime earnings gain)
     # PPP adjustment is applied to the total *undiscounted nominal* earnings gain.
+
     ppp_adjusted_earnings_gain = (lifetime_earnings - counterfactual_lifetime_earnings) * impact_params.ppp_multiplier
     
     # Health utility: Fixed value of 3.0 utils, discounted to PV from graduation time.
@@ -531,13 +532,16 @@ def calculate_student_statistics(student: Student, num_years: int, remittance_ra
     if student.is_graduated:
         # student.actual_years_to_complete is relative to the student's start.
         year_of_health_benefit_realization = student.start_year + student.actual_years_to_complete
+
         # Health benefit for graduates is a fixed 3.0 utils, discounted to present value.
         # Source/Rationale for 3.0 utils: [Specify, e.g., based on GiveWell's X report/analysis or internal valuation]
+
         health_utility_pv = 3.0 * ((1 / (1 + impact_params.discount_rate)) ** year_of_health_benefit_realization)
 
     # Migration utility (based on already discounted total_utility_gain)
     migration_utility_pv = 0.0
     if student.is_graduated and not student.is_home:
+
         # Migration influence calculated on the present value of the student's total utility gain.
         migration_utility_pv = utility_gains['total_utility_gain'] * impact_params.migration_influence_factor # total_utility_gain is already PV
     
