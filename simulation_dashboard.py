@@ -2157,17 +2157,25 @@ def update_results(n_clicks, program_type, initial_investment,
         'Uganda': 9249
     }
     
+    # Default initializations
+    isa_total_utility = 0.0
+    # program_type is available as a State input to update_results
+    isa_program_name = f"{program_type} Program (Scenario data not available)" 
+
     # Prepare ISA program data - get total utility
     if simulation_mode == 'percentile':
-        # Use median (p50) scenario for comparison
-        p50_results = all_results['p50']
-        isa_total_utility = p50_results.get('total_graduated_program_net_utility_pv', 0.0)
-        isa_program_name = f"{program_type} Program (P50)"
-    else:
-        # Use custom scenario for comparison
-        custom_results = all_results['Custom']
-        isa_total_utility = custom_results.get('total_graduated_program_net_utility_pv', 0.0)
-        isa_program_name = f"{program_type} Program (Custom)"
+        if 'p50' in all_results:
+            p50_results = all_results['p50']
+            isa_total_utility = p50_results.get('total_graduated_program_net_utility_pv', 0.0)
+            isa_program_name = f"{program_type} Program (P50)"
+        # If 'p50' is not in all_results, isa_total_utility and isa_program_name will retain their default values.
+        
+    else:  # custom mode
+        if 'Custom' in all_results:
+            custom_results = all_results['Custom']
+            isa_total_utility = custom_results.get('total_graduated_program_net_utility_pv', 0.0)
+            isa_program_name = f"{program_type} Program (Custom)"
+        # If 'Custom' is not in all_results, isa_total_utility and isa_program_name will retain their default values.
 
     # Calculate "X times cash" metric
     benchmark_country_for_metric = 'Kenya' # Default
