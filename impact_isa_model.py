@@ -63,9 +63,9 @@ class ImpactParams:
     discount_rate: float  # Annual discount rate for utility calculations
     counterfactual: CounterfactualParams
     ppp_multiplier: float = 0.42  # Purchasing power parity multiplier for German to Ugandan earnings
-    health_benefit_per_dollar: float = 0.00003  # Health utility gained per dollar of additional income (based on GiveWell's approach)
-    migration_influence_factor: float = 0.05  # Additional people who migrate due to observing success
-    moral_weight: float = 1.44  # Moral weight (alpha) for direct income effects, based on GiveWell's approach
+    health_benefit_per_dollar: float = 0.00003  # Health utility gained per dollar of additional income. Note: The current model in calculate_student_statistics uses a fixed 3.0 utils for health benefits for graduates, not this per-dollar rate. This parameter is available for alternative health utility calculations.
+    migration_influence_factor: float = 0.05  # Additional people who migrate due to observing success. Source/Rationale for 0.05: [Specify if known]
+    moral_weight: float = 1.44  # Moral weight (alpha) for direct income effects. Source/Rationale for 1.44: [Specify, e.g., GiveWell's standard moral weight or internal valuation]
 
 def calculate_utility(income: float) -> float:
     """Calculate log utility for a given income level."""
@@ -239,76 +239,6 @@ class Student:
     def calculate_utility(self, income: float, alpha: float) -> float:
         """Calculate utility for a given income level."""
         return calculate_utility(income)
-
-    def calculate_statistics(self, year: Year) -> Dict:
-        """Calculate various statistics for the student's outcomes."""
-        # Calculate total earnings and counterfactual earnings in real terms
-        total_earnings = np.sum(self.earnings / year.deflator)
-        total_counterfactual = np.sum(self.counterfactual_earnings / year.deflator)
-        earnings_gain = total_earnings - total_counterfactual
-        
-        # Calculate remittances (15% of earnings) in real terms
-        remittance_rate = 0.15
-        remittances = self.earnings * remittance_rate / year.deflator
-        counterfactual_remittances = self.counterfactual_earnings * remittance_rate / year.deflator
-        remittance_gain = np.sum(remittances) - np.sum(counterfactual_remittances)
-        
-        # Calculate student utility using GiveWell's approach with moral weight of 1.44
-        moral_weight = 1.44  # GiveWell's moral weight (alpha)
-        student_utility = np.sum([
-            moral_weight * calculate_utility(e/d - r/d)
-            for e, r, d in zip(self.earnings, remittances, [year.deflator] * len(self.earnings))
-        ])
-        counterfactual_utility = np.sum([
-            moral_weight * calculate_utility(e/d - r/d)
-            for e, r, d in zip(self.counterfactual_earnings, counterfactual_remittances, [year.deflator] * len(self.counterfactual_earnings))
-        ])
-        utility_gain = student_utility - counterfactual_utility
-        
-        # Calculate remittance utility (4 family members)
-        base_consumption = 511  # Updated to match GiveWell's BOTEC
-        remittance_utility = np.sum([
-            calculate_remittance_utility(r/d, base_consumption)
-            for r, d in zip(remittances, [year.deflator] * len(remittances))
-        ])
-        counterfactual_remittance_utility = np.sum([
-            calculate_remittance_utility(r/d, base_consumption)
-            for r, d in zip(counterfactual_remittances, [year.deflator] * len(counterfactual_remittances))
-        ])
-        remittance_utility_gain = remittance_utility - counterfactual_remittance_utility
-        
-        # Calculate PPP-adjusted earnings gain (applying PPP multiplier to convert German earnings to Ugandan equivalent)
-        ppp_adjusted_earnings_gain = earnings_gain * 0.42
-        
-        # Calculate health benefits using GiveWell's approach
-        # Life expectancy improvement from 62 to 81 years (19 years)
-        # Value of 40 units for this improvement, discounted at 5%
-        # This results in approximately 3 utils per student, which is a fraction of income utility (about 160)
-        health_utility = 3.0  # Fixed value based on GiveWell's approach
-        
-        # Calculate follow-the-leader migration effects
-        migration_utility = 0
-        if self.is_graduated and not self.is_home:
-            # Each successful graduate influences 0.05 additional people to migrate
-            # They get the same utility gain as this student
-            migration_utility = (utility_gain + remittance_utility_gain) * 0.05
-        
-        return {
-            'earnings_gain': earnings_gain,
-            'ppp_adjusted_earnings_gain': ppp_adjusted_earnings_gain,
-            'remittance_gain': remittance_gain,
-            'utility_gains': {
-                'student_utility_gain': utility_gain,
-                'remittance_utility_gain': remittance_utility_gain,
-                'total_utility_gain': utility_gain + remittance_utility_gain
-            },
-            'health_utility': health_utility,
-            'migration_utility': migration_utility,
-            'total_earnings': total_earnings,
-            'total_counterfactual': total_counterfactual,
-            'total_remittances': np.sum(remittances),
-            'total_counterfactual_remittances': np.sum(counterfactual_remittances)
-        }
 
 @dataclass
 class Contract:
@@ -516,65 +446,65 @@ def calculate_student_statistics(student: Student, num_years: int, remittance_ra
     
     Parameters:
     - student: Student object
-    - num_years: Number of years in simulation
+    - num_years: Number of years in simulation (this refers to the student's specific simulation duration)
     - remittance_rate: Percentage of income sent as remittances
     - impact_params: Parameters for impact calculation
     
     Returns:
     - Dictionary of student statistics
     """
-    # Calculate lifetime earnings
+    # Calculate lifetime earnings (undiscounted sum)
     lifetime_earnings = np.sum(student.earnings)
     
-    # Calculate real (present value) earnings
-    discount_factors = np.array([(1 / (1 + impact_params.discount_rate)) ** t for t in range(num_years)])
-    lifetime_real_earnings = np.sum(student.earnings[:len(discount_factors)] * discount_factors[:len(student.earnings)])
+    # Calculate real (present value) earnings, discounted to absolute simulation year 0
+    if len(student.earnings) == 0:
+        lifetime_real_earnings = 0.0
+    else:
+        # 't' is the index relative to the start of the student's earnings array.
+        # Earning at student.earnings[t] occurred in absolute simulation year 'student.start_year + t'.
+        discount_factors_for_pv_earnings = np.array([(1 / (1 + impact_params.discount_rate)) ** (student.start_year + t) for t in range(len(student.earnings))])
+        lifetime_real_earnings = np.sum(student.earnings * discount_factors_for_pv_earnings)
     
-    # Calculate counterfactual lifetime earnings
-    counterfactual_lifetime_earnings = np.sum(student.counterfactual_earnings)
-    
-    # Calculate remittances
+    # Calculate counterfactual lifetime earnings (undiscounted sum)
+    counterfactual_lifetime_earnings = np.sum(student.counterfactual_earnings) 
+
+    # Calculate remittances (based on undiscounted earnings)
     lifetime_remittances = lifetime_earnings * remittance_rate
     counterfactual_remittances = counterfactual_lifetime_earnings * impact_params.counterfactual.remittance_rate
     
-    # Calculate yearly utilities with proper discounting
+    # Calculate yearly utilities with proper discounting to absolute simulation year 0
     yearly_utilities = []
     yearly_counterfactual_utilities = []
     
-    for year in range(len(student.earnings)):
-        if year < len(student.earnings):
-            # Apply discount factor for this year
-            discount_factor = (1 / (1 + impact_params.discount_rate)) ** year if year < len(discount_factors) else 0
-            
-            # Calculate utilities for this year
-            year_utils = calculate_total_utility(
-                student.earnings[year],
-                student.counterfactual_earnings[year],
-                remittance_rate,
-                impact_params.moral_weight
-            )
-            
-            # Apply discount factor to all utility components
-            for key in year_utils:
-                year_utils[key] *= discount_factor
-                
-            yearly_utilities.append(year_utils)
-            
-            # Counterfactual utilities (only remittances from base earnings)
-            counterfactual_utils = calculate_total_utility(
-                student.counterfactual_earnings[year],
-                0,  # No counterfactual to counterfactual
-                impact_params.counterfactual.remittance_rate,
-                impact_params.moral_weight
-            )
-            
-            # Apply discount factor to counterfactual utilities
-            for key in counterfactual_utils:
-                counterfactual_utils[key] *= discount_factor
-                
-            yearly_counterfactual_utilities.append(counterfactual_utils)
+    for idx_relative_to_student_earnings in range(len(student.earnings)):
+        absolute_simulation_year = student.start_year + idx_relative_to_student_earnings
+        discount_factor = (1 / (1 + impact_params.discount_rate)) ** absolute_simulation_year
+        
+        # Calculate per-year undiscounted utilities
+        year_utils = calculate_total_utility(
+            student.earnings[idx_relative_to_student_earnings],
+            student.counterfactual_earnings[idx_relative_to_student_earnings],
+            remittance_rate,
+            impact_params.moral_weight
+        )
+        # Discount and store
+        for key in year_utils:
+            year_utils[key] *= discount_factor
+        yearly_utilities.append(year_utils)
+        
+        # Calculate per-year undiscounted counterfactual utilities
+        counterfactual_utils = calculate_total_utility(
+            student.counterfactual_earnings[idx_relative_to_student_earnings],
+            0,  # No counterfactual to counterfactual
+            impact_params.counterfactual.remittance_rate,
+            impact_params.moral_weight
+        )
+        # Discount and store
+        for key in counterfactual_utils:
+            counterfactual_utils[key] *= discount_factor
+        yearly_counterfactual_utilities.append(counterfactual_utils)
     
-    # Sum utilities over time
+    # Sum discounted yearly utilities to get total present values
     total_student_utility = sum(u['student_utility'] for u in yearly_utilities)
     total_remittance_utility = sum(u['remittance_utility'] for u in yearly_utilities)
     total_utility = sum(u['total_utility'] for u in yearly_utilities)
@@ -583,66 +513,63 @@ def calculate_student_statistics(student: Student, num_years: int, remittance_ra
     counterfactual_remittance_utility = sum(u['remittance_utility'] for u in yearly_counterfactual_utilities)
     counterfactual_total_utility = sum(u['total_utility'] for u in yearly_counterfactual_utilities)
     
-    # Calculate utility gains
     utility_gains = {
         'student_utility_gain': total_student_utility - counterfactual_student_utility,
         'remittance_utility_gain': total_remittance_utility - counterfactual_remittance_utility,
         'total_utility_gain': total_utility - counterfactual_total_utility
     }
     
-    # Calculate employment statistics
     years_employed = np.sum(student.employment_history)
+    total_isa_payments = np.sum(student.payments) # Undiscounted sum
     
-    # Calculate ISA payments
-    total_isa_payments = np.sum(student.payments)
-    
-    # Calculate PPP-adjusted earnings gain
+    # PPP-adjusted earnings gain (based on undiscounted lifetime earnings gain)
+    # PPP adjustment is applied to the total *undiscounted nominal* earnings gain.
     ppp_adjusted_earnings_gain = (lifetime_earnings - counterfactual_lifetime_earnings) * impact_params.ppp_multiplier
     
-    # Calculate health benefits using GiveWell's approach
-    # Life expectancy improvement from 62 to 81 years (19 years)
-    # Value of 40 units for this improvement, discounted at 5%
-    # This results in approximately 3 utils per student, which is a fraction of income utility (about 160)
-    health_utility = 3.0  # Fixed value based on GiveWell's approach
-    
-    # Calculate follow-the-leader migration effects
-    migration_utility = 0
+    # Health utility: Fixed value of 3.0 utils, discounted to PV from graduation time.
+    health_utility_pv = 0.0
+    if student.is_graduated:
+        # student.actual_years_to_complete is relative to the student's start.
+        year_of_health_benefit_realization = student.start_year + student.actual_years_to_complete
+        # Health benefit for graduates is a fixed 3.0 utils, discounted to present value.
+        # Source/Rationale for 3.0 utils: [Specify, e.g., based on GiveWell's X report/analysis or internal valuation]
+        health_utility_pv = 3.0 * ((1 / (1 + impact_params.discount_rate)) ** year_of_health_benefit_realization)
+
+    # Migration utility (based on already discounted total_utility_gain)
+    migration_utility_pv = 0.0
     if student.is_graduated and not student.is_home:
-        # Calculate average utility gain for a successful migrant
-        avg_utility_gain = utility_gains['total_utility_gain']
-        # Each graduate influences impact_params.migration_influence_factor additional people
-        migration_utility = avg_utility_gain * impact_params.migration_influence_factor
+        # Migration influence calculated on the present value of the student's total utility gain.
+        migration_utility_pv = utility_gains['total_utility_gain'] * impact_params.migration_influence_factor # total_utility_gain is already PV
     
-    # Update total utility gains with new factors
-    utility_gains['health_utility_gain'] = health_utility
-    utility_gains['migration_influence_utility_gain'] = migration_utility
+    utility_gains['health_utility_gain'] = health_utility_pv 
+    utility_gains['migration_influence_utility_gain'] = migration_utility_pv 
     utility_gains['total_utility_gain_with_extras'] = (
         utility_gains['total_utility_gain'] + 
-        health_utility + 
-        migration_utility
+        health_utility_pv + 
+        migration_utility_pv
     )
     
     return {
         'degree_type': student.degree.name,
         'graduated': student.is_graduated,
         'dropped_out': not student.is_graduated,
-        'lifetime_earnings': lifetime_earnings,
-        'lifetime_real_earnings': lifetime_real_earnings,
-        'counterfactual_lifetime_earnings': counterfactual_lifetime_earnings,
-        'earnings_gain': lifetime_earnings - counterfactual_lifetime_earnings,
-        'ppp_adjusted_earnings_gain': ppp_adjusted_earnings_gain,
-        'lifetime_remittances': lifetime_remittances,
-        'counterfactual_remittances': counterfactual_remittances,
-        'remittance_gain': lifetime_remittances - counterfactual_remittances,
-        'utility_gains': utility_gains,
-        'health_utility': health_utility,
-        'migration_utility': migration_utility,
+        'lifetime_earnings': lifetime_earnings,  # Undiscounted
+        'lifetime_real_earnings': lifetime_real_earnings,  # Discounted to year 0
+        'counterfactual_lifetime_earnings': counterfactual_lifetime_earnings,  # Undiscounted
+        'earnings_gain': lifetime_earnings - counterfactual_lifetime_earnings,  # Undiscounted
+        'ppp_adjusted_earnings_gain': ppp_adjusted_earnings_gain,  # Based on undiscounted gain
+        'lifetime_remittances': lifetime_remittances,  # Undiscounted
+        'counterfactual_remittances': counterfactual_remittances,  # Undiscounted
+        'remittance_gain': lifetime_remittances - counterfactual_remittances,  # Undiscounted
+        'utility_gains': utility_gains,  # All components are PVs
+        'health_utility': health_utility_pv,  # PV of fixed health utility
+        'migration_utility': migration_utility_pv,  # PV of migration utility
         'years_employed': years_employed,
-        'total_isa_payments': total_isa_payments,
+        'total_isa_payments': total_isa_payments,  # Undiscounted sum
         'years_paid_isa': student.years_paid,
         'hit_payment_cap': student.hit_cap,
-        'yearly_utilities': yearly_utilities,
-        'yearly_counterfactual_utilities': yearly_counterfactual_utilities
+        'yearly_utilities': yearly_utilities,  # List of dicts, values already discounted to year 0
+        'yearly_counterfactual_utilities': yearly_counterfactual_utilities  # List of dicts, values already discounted to year 0
     }
 
 def simulate_impact(
@@ -905,10 +832,14 @@ def simulate_impact(
         total_ppp_adjusted_earnings_gain = 0.0
         total_remittance_gain = 0.0
         num_graduated = 0
+        total_graduated_program_utility_with_extras_sum = 0.0 # New sum
         
         for student in students:
             if student.is_graduated:
-                stats = student.calculate_statistics(year)
+                # student.num_years is the duration for this specific student
+                # remittance_rate is an argument to simulate_impact
+                # impact_params is an argument to simulate_impact
+                stats = calculate_student_statistics(student, student.num_years, remittance_rate, impact_params)
                 total_student_utility += stats['utility_gains']['student_utility_gain']
                 total_remittance_utility += stats['utility_gains']['remittance_utility_gain']
                 total_health_utility += stats['health_utility']
@@ -916,6 +847,9 @@ def simulate_impact(
                 total_earnings_gain += stats['earnings_gain']
                 total_ppp_adjusted_earnings_gain += stats['ppp_adjusted_earnings_gain']
                 total_remittance_gain += stats['remittance_gain']
+                
+                total_graduated_program_utility_with_extras_sum += stats['utility_gains']['total_utility_gain_with_extras'] # Add to new sum
+                
                 num_graduated += 1
         
         if num_graduated > 0:
@@ -957,6 +891,7 @@ def simulate_impact(
         'contract_metrics': pool.contract_metrics,
         'yearly_data': yearly_data,
         'student_metrics': student_metrics,
+        'total_graduated_program_net_utility_pv': total_graduated_program_utility_with_extras_sum, # New field
         'total_payments': total_payments
     }
 
@@ -1210,16 +1145,21 @@ def aggregate_simulation_results(results: List[Dict]) -> Dict:
     impact_metrics = {
         'avg_utility_gain': np.mean([
             r['student_metrics']['avg_total_utility_gain']
-            for r in results
+            for r in results if 'student_metrics' in r and 'avg_total_utility_gain' in r['student_metrics']
         ]),
         'avg_earnings_gain': np.mean([
             r['student_metrics']['avg_earnings_gain']
-            for r in results
+            for r in results if 'student_metrics' in r and 'avg_earnings_gain' in r['student_metrics']
         ]),
         'avg_remittance_gain': np.mean([
             r['student_metrics']['avg_remittance_gain']
-            for r in results
-        ])
+            for r in results if 'student_metrics' in r and 'avg_remittance_gain' in r['student_metrics']
+        ]),
+        # New metric: average of the total PV utility generated by graduates per simulation
+        'avg_total_graduated_program_net_utility_pv': np.mean([
+            r['total_graduated_program_net_utility_pv'] 
+            for r in results if 'total_graduated_program_net_utility_pv' in r
+        ]) if num_sims > 0 and any('total_graduated_program_net_utility_pv' in r for r in results) else 0.0
     }
     
     # Calculate financial metrics
