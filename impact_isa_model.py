@@ -63,7 +63,7 @@ class ImpactParams:
     discount_rate: float  # Annual discount rate for utility calculations
     counterfactual: CounterfactualParams
     ppp_multiplier: float = 0.42  # Purchasing power parity multiplier for German to Ugandan earnings
-    health_benefit_per_dollar: float = 0.00003  # Health utility gained per dollar of additional income (based on GiveWell's approach)
+    health_benefit_per_euro: float = 0.00003  # Health utility gained per euro of additional income (based on GiveWell's approach)
     migration_influence_factor: float = 0.05  # Additional people who migrate due to observing success
     moral_weight: float = 1.44  # Moral weight (alpha) for direct income effects, based on GiveWell's approach
 
@@ -282,7 +282,7 @@ class Student:
         
         # Calculate health benefits using GiveWell's approach
         # Life expectancy improvement from 62 to 81 years (19 years)
-        # Value of 40 units for this improvement, discounted at 5%
+        # Value of 40 units for this improvement, discounted at 4%
         # This results in approximately 3 utils per student, which is a fraction of income utility (about 160)
         health_utility = 3.0  # Fixed value based on GiveWell's approach
         
@@ -436,7 +436,7 @@ def calculate_remittance_utility(remittance_amount: float, base_consumption: flo
     
     Args:
         remittance_amount: Annual remittance amount
-        base_consumption: Base annual consumption per family member ($511 from GiveWell BOTEC)
+        base_consumption: Base annual consumption per family member (€511 from GiveWell BOTEC)
         num_recipients: Number of family members receiving remittances
         
     Returns:
@@ -1347,8 +1347,8 @@ def main():
     initial_students = int(available_for_students / price_per_student)
     
     print(f"\nRunning {args.scenario} scenario for {program_display_name} program")
-    print(f"Initial investment: ${args.investment:,.2f}")
-    print(f"Price per student: ${price_per_student:,.2f}")
+    print(f"Initial investment: €{args.investment:,.2f}")
+    print(f"Price per student: €{price_per_student:,.2f}")
     print(f"Initial students that can be funded: {initial_students}")
     
     # Set random seed if provided
@@ -1357,7 +1357,7 @@ def main():
     
     # Set up impact parameters
     impact_params = ImpactParams(
-        discount_rate=0.05,
+        discount_rate=0.04,
         counterfactual=CounterfactualParams(
             base_earnings=2200,
             earnings_growth=0.01,
@@ -1365,7 +1365,7 @@ def main():
             employment_rate=0.9
         ),
         ppp_multiplier=0.42,
-        health_benefit_per_dollar=0.00003,
+        health_benefit_per_euro=0.00003,
         migration_influence_factor=0.05,
         moral_weight=1.44
     )
@@ -1385,23 +1385,23 @@ def main():
     # Print standard summary
     print("\nPortfolio Performance Summary")
     print("=" * 40)
-    print(f"Initial Investment: ${results['initial_investment']:,.2f}")
-    print(f"Price per Student: ${results['price_per_student']:,.2f}")
+    print(f"Initial Investment: €{results['initial_investment']:,.2f}")
+    print(f"Price per Student: €{results['price_per_student']:,.2f}")
     print(f"Initial Students Funded: {initial_students}")
     print(f"\nISA Parameters:")
     print(f"  - Percentage: {results['isa_percentage']*100:.1f}%")
-    print(f"  - Cap: ${results['isa_cap']:,.2f}")
-    print(f"  - Threshold: ${results['isa_threshold']:,.2f}")
+    print(f"  - Cap: €{results['isa_cap']:,.2f}")
+    print(f"  - Threshold: €{results['isa_threshold']:,.2f}")
     
     print("\nFinancial Metrics:")
-    print(f"Average Total Payments: ${results['financial_metrics']['avg_total_payments']:,.2f}")
+    print(f"Average Total Payments: €{results['financial_metrics']['avg_total_payments']:,.2f}")
     print(f"Average Total Students Funded: {results['financial_metrics']['avg_students_funded']:.1f}")
     print(f"Average Students per Initial Investment: {results['financial_metrics']['avg_students_funded']/initial_students:.2f}x")
     
     print("\nImpact Metrics:")
     print(f"Average Utility Gain: {results['impact_metrics']['avg_utility_gain']:.2f}")
-    print(f"Average Earnings Gain: ${results['impact_metrics']['avg_earnings_gain']:,.2f}")
-    print(f"Average Remittance Gain: ${results['impact_metrics']['avg_remittance_gain']:,.2f}")
+    print(f"Average Earnings Gain: €{results['impact_metrics']['avg_earnings_gain']:,.2f}")
+    print(f"Average Remittance Gain: €{results['impact_metrics']['avg_remittance_gain']:,.2f}")
     
     # Print student outcomes if available
     if results.get('student_outcomes'):

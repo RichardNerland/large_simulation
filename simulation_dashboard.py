@@ -35,10 +35,10 @@ counterfactual_params = CounterfactualParams(
 )
 
 impact_params = ImpactParams(
-    discount_rate=0.05,
+    discount_rate=0.04,
     counterfactual=counterfactual_params,
     ppp_multiplier=0.42,
-    health_benefit_per_dollar=0.0001,
+    health_benefit_per_euro=0.0001,
     migration_influence_factor=0.05,
     moral_weight=1.44
 )
@@ -708,7 +708,7 @@ def precompute_percentile_scenarios():
             # Run simulation with fixed parameters
             results = simulate_impact(
                 program_type=program_type,
-                initial_investment=1000000,  # Fixed at $1M
+                initial_investment=1000000,  # Fixed at €1M
                 num_years=45,
                 impact_params=impact_params,
                 num_sims=1,
@@ -753,13 +753,25 @@ def create_custom_degree_params(program_type, ba_weight=None, ma_weight=None, as
                                trade_weight=None, asst_weight_trade=None, asst_shift_weight_trade=None, na_weight_trade=None):
     """Create degree parameters based on custom user-defined weights."""
     
-    # Convert percentage inputs to decimals
+    # Convert percentage inputs to decimals and normalize
     if program_type == 'University':
         # Uganda program
-        ba_pct = (ba_weight or 45) / 100
-        ma_pct = (ma_weight or 24) / 100
-        asst_shift_pct = (asst_shift_weight_uni or 27) / 100
-        na_pct = (na_weight_uni or 4) / 100
+        raw_weights = [
+            ba_weight or 45,
+            ma_weight or 24,
+            asst_shift_weight_uni or 27,
+            na_weight_uni or 4
+        ]
+        # Normalize weights to sum to 1.0
+        total_weight = sum(raw_weights)
+        if total_weight > 0:
+            ba_pct = (ba_weight or 45) / total_weight
+            ma_pct = (ma_weight or 24) / total_weight
+            asst_shift_pct = (asst_shift_weight_uni or 27) / total_weight
+            na_pct = (na_weight_uni or 4) / total_weight
+        else:
+            # Fallback to equal weights if all are zero
+            ba_pct = ma_pct = asst_shift_pct = na_pct = 0.25
         
         return [
             (DegreeParams(
@@ -798,10 +810,22 @@ def create_custom_degree_params(program_type, ba_weight=None, ma_weight=None, as
     
     elif program_type == 'Nurse':
         # Kenya program
-        nurse_pct = (nurse_weight or 30) / 100
-        asst_pct = (asst_weight_nurse or 40) / 100
-        asst_shift_pct = (asst_shift_weight_nurse or 20) / 100
-        na_pct = (na_weight_nurse or 10) / 100
+        raw_weights = [
+            nurse_weight or 30,
+            asst_weight_nurse or 40,
+            asst_shift_weight_nurse or 20,
+            na_weight_nurse or 10
+        ]
+        # Normalize weights to sum to 1.0
+        total_weight = sum(raw_weights)
+        if total_weight > 0:
+            nurse_pct = (nurse_weight or 30) / total_weight
+            asst_pct = (asst_weight_nurse or 40) / total_weight
+            asst_shift_pct = (asst_shift_weight_nurse or 20) / total_weight
+            na_pct = (na_weight_nurse or 10) / total_weight
+        else:
+            # Fallback to equal weights if all are zero
+            nurse_pct = asst_pct = asst_shift_pct = na_pct = 0.25
         
         return [
             (DegreeParams(
@@ -840,10 +864,22 @@ def create_custom_degree_params(program_type, ba_weight=None, ma_weight=None, as
     
     else:  # Trade program
         # Rwanda program
-        trade_pct = (trade_weight or 40) / 100
-        asst_pct = (asst_weight_trade or 30) / 100
-        asst_shift_pct = (asst_shift_weight_trade or 15) / 100
-        na_pct = (na_weight_trade or 15) / 100
+        raw_weights = [
+            trade_weight or 40,
+            asst_weight_trade or 30,
+            asst_shift_weight_trade or 15,
+            na_weight_trade or 15
+        ]
+        # Normalize weights to sum to 1.0
+        total_weight = sum(raw_weights)
+        if total_weight > 0:
+            trade_pct = (trade_weight or 40) / total_weight
+            asst_pct = (asst_weight_trade or 30) / total_weight
+            asst_shift_pct = (asst_shift_weight_trade or 15) / total_weight
+            na_pct = (na_weight_trade or 15) / total_weight
+        else:
+            # Fallback to equal weights if all are zero
+            trade_pct = asst_pct = asst_shift_pct = na_pct = 0.25
         
         return [
             (DegreeParams(
@@ -931,8 +967,8 @@ dashboard_layout = html.Div([
             ], style={'marginBottom': '20px'}),
             
             html.Div([
-                html.Label("Initial Investment ($):", style={'fontWeight': 'bold', 'marginBottom': '5px', 'display': 'block'}),
-                html.Div("$1,000,000 (fixed)", style={'width': '100%', 'padding': '8px', 'borderRadius': '5px', 
+                html.Label("Initial Investment (€):", style={'fontWeight': 'bold', 'marginBottom': '5px', 'display': 'block'}),
+                html.Div("€1,000,000 (fixed)", style={'width': '100%', 'padding': '8px', 'borderRadius': '5px', 
                                                      'border': '1px solid #ddd', 'backgroundColor': '#f5f5f5',
                                                      'fontStyle': 'italic'})
             ], style={'marginBottom': '20px'}),
@@ -1020,16 +1056,16 @@ dashboard_layout = html.Div([
                                 ], style={'padding': '10px', 'backgroundColor': '#f9f9f9', 'borderRadius': '5px', 'marginBottom': '15px'}),
                                 dcc.Graph(id='impact-metrics-graph')
                             ]),
-                            dcc.Tab(label='Impact Metrics (Dollars)', children=[
+                            dcc.Tab(label='Impact Metrics (Euros)', children=[
                                 html.Div([
-                                    html.H4("Understanding Impact Metrics in Dollars"),
+                                    html.H4("Understanding Impact Metrics in Euros"),
                                     html.P([
-                                        "This graph shows the total earnings gain (in dollars) generated across different percentile scenarios. ",
+                                        "This graph shows the total earnings gain (in euros) generated across different percentile scenarios. ",
                                         "It represents the direct financial impact of the program on students' lifetime earnings. ",
                                         "This metric helps assess the economic return on investment from the program."
                                     ])
                                 ], style={'padding': '10px', 'backgroundColor': '#f9f9f9', 'borderRadius': '5px', 'marginBottom': '15px'}),
-                                dcc.Graph(id='dollars-impact-graph')
+                                dcc.Graph(id='euros-impact-graph')
                             ]),
                             dcc.Tab(label='Yearly Cash Flow', children=[
                                 html.Div([
@@ -1045,16 +1081,16 @@ dashboard_layout = html.Div([
                             dcc.Tab(label='GiveWell Comparison', children=[
                                 html.Div([
                                     html.H4("GiveDirectly Cash Transfer Comparison"),
-                                    html.P([
-                                        "This section compares the impact of a $1,000,000 donation to GiveDirectly's Cash for Poverty Relief program across different countries. ",
-                                        "The data is based on GiveWell's latest cost-effectiveness analysis showing how $1 million would create value in different dimensions. ",
-                                        "This provides a benchmark for comparing our program's impact against a proven effective intervention."
-                                    ])
+                                                                    html.P([
+                                    "This section compares the impact of a $1,000,000 donation to GiveDirectly's Cash for Poverty Relief program across different countries. ",
+                                    "The data is based on GiveWell's latest cost-effectiveness analysis showing how €1 million would create value in different dimensions. ",
+                                    "This provides a benchmark for comparing our program's impact against a proven effective intervention."
+                                ])
                                 ], style={'padding': '10px', 'backgroundColor': '#f9f9f9', 'borderRadius': '5px', 'marginBottom': '15px'}),
                                 
                                 # GiveWell cash transfer data table
                                 html.Div([
-                                    html.H4("$1M to GiveDirectly: Cost-Effectiveness Analysis (CEA)"),
+                                    html.H4("€1M to GiveDirectly: Cost-Effectiveness Analysis (CEA)"),
                                     html.P("Breakdown of bottom-line value from GiveWell's latest analysis of GiveDirectly's Cash for Poverty Relief program"),
                                     
                                     # Create the table using dash_table
@@ -1074,7 +1110,7 @@ dashboard_layout = html.Div([
                                             {"category": "Mortality benefits", "kenya": 1065, "malawi": 1131, "mozambique": 1739, "rwanda": 856, "uganda": 1188},
                                             {"category": "Additional benefits and downsides", "kenya": 648, "malawi": 949, "mozambique": 915, "rwanda": 818, "uganda": 685},
                                             {"category": "Total units of value", "kenya": 8742, "malawi": 12810, "mozambique": 12349, "rwanda": 11040, "uganda": 9249},
-                                            {"category": "Units of value per $", "kenya": 0.009, "malawi": 0.013, "mozambique": 0.012, "rwanda": 0.011, "uganda": 0.009},
+                                            {"category": "Units of value per €", "kenya": 0.009, "malawi": 0.013, "mozambique": 0.012, "rwanda": 0.011, "uganda": 0.009},
                                         ],
                                         style_cell={'textAlign': 'center'},
                                         style_header={
@@ -1158,7 +1194,7 @@ dashboard_layout = html.Div([
                                                     }
                                                 ],
                                                 'layout': {
-                                                    'title': 'Value Distribution of $1M Donation to GiveDirectly by Country',
+                                                    'title': 'Value Distribution of €1M Donation to GiveDirectly by Country',
                                                     'barmode': 'stack',
                                                     'xaxis': {'title': 'Country'},
                                                     'yaxis': {'title': 'Units of Value'}
@@ -1170,7 +1206,7 @@ dashboard_layout = html.Div([
                                     # Add direct comparison chart (dynamically updated with simulation results)
                                     html.Div([
                                         html.H4("Direct Comparison: ISA Program vs GiveDirectly", style={'marginTop': '30px'}),
-                                        html.P("This chart compares the total utility value generated by our program versus GiveDirectly's Cash for Poverty Relief program for a $1M donation."),
+                                        html.P("This chart compares the total utility value generated by our program versus GiveDirectly's Cash for Poverty Relief program for a €1M donation."),
                                         dcc.Graph(id='isa-vs-givedirectly-chart')
                                     ]),
                                     
@@ -1178,8 +1214,8 @@ dashboard_layout = html.Div([
                                         html.H4("Notes on GiveWell's Cost-Effectiveness Analysis", style={'marginTop': '20px'}),
                                         html.P([
                                             "The units of value in GiveWell's analysis represent welfare benefits, adjusted with moral weights. ",
-                                            "A key benchmark is that GiveWell typically considers a program to be cost-effective if it achieves 10x the value per dollar compared to direct cash transfers. ",
-                                            "The values shown for GiveDirectly represent what $1 million would achieve if donated directly to their Cash for Poverty Relief program."
+                                            "A key benchmark is that GiveWell typically considers a program to be cost-effective if it achieves 10x the value per euro compared to direct cash transfers. ",
+                                            "The values shown for GiveDirectly represent what €1 million would achieve if donated directly to their Cash for Poverty Relief program."
                                         ]),
                                         html.P([
                                             "Source: GiveWell's 2024 cost-effectiveness analysis of GiveDirectly's Cash for Poverty Relief program. ",
@@ -1450,9 +1486,9 @@ def update_calculated_students(program_type):
     initial_students = int(available_for_students / price_per_student)
     
     return html.Div([
-        html.P(f"{program_name} Program - Price per student: ${price_per_student:,.2f}", style={'marginBottom': '5px'}),
+        html.P(f"{program_name} Program - Price per student: €{price_per_student:,.2f}", style={'marginBottom': '5px'}),
         html.P([
-            f"Initial investment: ${initial_investment:,} (fixed)",
+            f"Initial investment: €{initial_investment:,} (fixed)",
             html.Br(),
             f"Initial students that can be funded: {initial_students}"
         ], style={'fontWeight': 'bold'})
@@ -1492,6 +1528,94 @@ def update_stored_weights(program_type, sliders, current_data):
             'asst-shift-weight-trade': 15,
             'na-weight-trade': 15
         })
+    
+    return stored_data
+
+# Add separate callbacks for each program type to capture slider values
+@app.callback(
+    Output('stored-weights', 'data'),
+    [Input('ba-weight', 'value'),
+     Input('ma-weight', 'value'),
+     Input('asst-shift-weight-uni', 'value'),
+     Input('na-weight-uni', 'value')],
+    [State('stored-weights', 'data'),
+     State('program-type', 'value')],
+    prevent_initial_call=True
+)
+def capture_university_slider_values(ba_weight, ma_weight, asst_shift_weight_uni, na_weight_uni, current_data, program_type):
+    """Capture University program slider values when they change"""
+    if program_type != 'University':
+        raise PreventUpdate
+    
+    stored_data = current_data or {}
+    
+    # Update weights
+    if ba_weight is not None:
+        stored_data['ba-weight'] = ba_weight
+    if ma_weight is not None:
+        stored_data['ma-weight'] = ma_weight
+    if asst_shift_weight_uni is not None:
+        stored_data['asst-shift-weight-uni'] = asst_shift_weight_uni
+    if na_weight_uni is not None:
+        stored_data['na-weight-uni'] = na_weight_uni
+    
+    return stored_data
+
+@app.callback(
+    Output('stored-weights', 'data', allow_duplicate=True),
+    [Input('nurse-weight', 'value'),
+     Input('asst-weight-nurse', 'value'),
+     Input('asst-shift-weight-nurse', 'value'),
+     Input('na-weight-nurse', 'value')],
+    [State('stored-weights', 'data'),
+     State('program-type', 'value')],
+    prevent_initial_call='initial_duplicate'
+)
+def capture_nurse_slider_values(nurse_weight, asst_weight_nurse, asst_shift_weight_nurse, na_weight_nurse, current_data, program_type):
+    """Capture Nurse program slider values when they change"""
+    if program_type != 'Nurse':
+        raise PreventUpdate
+    
+    stored_data = current_data or {}
+    
+    # Update weights
+    if nurse_weight is not None:
+        stored_data['nurse-weight'] = nurse_weight
+    if asst_weight_nurse is not None:
+        stored_data['asst-weight-nurse'] = asst_weight_nurse
+    if asst_shift_weight_nurse is not None:
+        stored_data['asst-shift-weight-nurse'] = asst_shift_weight_nurse
+    if na_weight_nurse is not None:
+        stored_data['na-weight-nurse'] = na_weight_nurse
+    
+    return stored_data
+
+@app.callback(
+    Output('stored-weights', 'data', allow_duplicate=True),
+    [Input('trade-weight', 'value'),
+     Input('asst-weight-trade', 'value'),
+     Input('asst-shift-weight-trade', 'value'),
+     Input('na-weight-trade', 'value')],
+    [State('stored-weights', 'data'),
+     State('program-type', 'value')],
+    prevent_initial_call='initial_duplicate'
+)
+def capture_trade_slider_values(trade_weight, asst_weight_trade, asst_shift_weight_trade, na_weight_trade, current_data, program_type):
+    """Capture Trade program slider values when they change"""
+    if program_type != 'Trade':
+        raise PreventUpdate
+    
+    stored_data = current_data or {}
+    
+    # Update weights
+    if trade_weight is not None:
+        stored_data['trade-weight'] = trade_weight
+    if asst_weight_trade is not None:
+        stored_data['asst-weight-trade'] = asst_weight_trade
+    if asst_shift_weight_trade is not None:
+        stored_data['asst-shift-weight-trade'] = asst_shift_weight_trade
+    if na_weight_trade is not None:
+        stored_data['na-weight-trade'] = na_weight_trade
     
     return stored_data
 
@@ -1554,7 +1678,7 @@ def toggle_custom_weights(mode):
     [Output('simulation-results', 'children'),
      Output('percentile-tables', 'children'),
      Output('impact-metrics-graph', 'figure'),
-     Output('dollars-impact-graph', 'figure'),
+     Output('euros-impact-graph', 'figure'),
      Output('yearly-cash-flow-table', 'children'),
      Output('loading-simulation', 'parent_className'),
      Output('isa-vs-givedirectly-chart', 'figure')],
@@ -1738,7 +1862,7 @@ def update_results(n_clicks, program_type, initial_investment,
             'Scenario': percentile,
             'IRR (%)': f"{results['irr']*100:.2f}%",
             'Students Educated': results['students_educated'],
-            'Avg Earnings Gain ($)': f"${results['student_metrics']['avg_earnings_gain']:,.2f}"
+            'Avg Earnings Gain (€)': f"€{results['student_metrics']['avg_earnings_gain']:,.2f}"
         })
     
     summary_df = pd.DataFrame(summary_data)
@@ -1758,7 +1882,7 @@ def update_results(n_clicks, program_type, initial_investment,
         html.Div([
             html.H4("Simulation Information"),
             html.P(f"Program Type: {program_type}"),
-            html.P(f"Initial Investment: ${initial_investment:,}"),
+            html.P(f"Initial Investment: €{initial_investment:,}"),
             html.P(f"Simulation Length: 45 years")
         ], style={'marginTop': '20px'})
     ])
@@ -1841,8 +1965,8 @@ def update_results(n_clicks, program_type, initial_investment,
             'Scenario': percentile,
             'IRR (%)': f"{results['irr']*100:.2f}%",
             'Students Educated': results['students_educated'],
-            'Cost per Student ($)': f"${initial_investment / results['students_educated']:,.2f}",
-            'Avg Payment ($)': f"${avg_payment:,.2f}",
+            'Cost per Student (€)': f"€{initial_investment / results['students_educated']:,.2f}",
+            'Avg Payment (€)': f"€{avg_payment:,.2f}",
             'Payment Cap (%)': f"{payment_cap_exits/total_contracts*100:.1f}%" if total_contracts > 0 else "0%",
             'Years Cap (%)': f"{years_cap_exits/total_contracts*100:.1f}%" if total_contracts > 0 else "0%",
             'Other Exits (%)': f"{other_exits/total_contracts*100:.1f}%" if total_contracts > 0 else "0%"
@@ -1876,8 +2000,8 @@ def update_results(n_clicks, program_type, initial_investment,
         results = all_results[percentile]
         impact_data.append({
             'Scenario': percentile,
-            'Avg Earnings Gain ($)': f"${results['student_metrics']['avg_earnings_gain']:,.2f}",
-            'Avg Remittance Gain ($)': f"${results['student_metrics']['avg_remittance_gain']:,.2f}"
+            'Avg Earnings Gain (€)': f"€{results['student_metrics']['avg_earnings_gain']:,.2f}",
+            'Avg Remittance Gain (€)': f"€{results['student_metrics']['avg_remittance_gain']:,.2f}"
         })
     
     impact_df = pd.DataFrame(impact_data)
@@ -1959,10 +2083,10 @@ def update_results(n_clicks, program_type, initial_investment,
         
         cash_flow_data.append({
             'Year': data['year'],
-            'Start of Year Cash ($)': f"${start_cash:,.2f}",
-            'Cash Flow from Repayments ($)': f"${data['returns']:,.2f}",
+            'Start of Year Cash (€)': f"€{start_cash:,.2f}",
+            'Cash Flow from Repayments (€)': f"€{data['returns']:,.2f}",
             'Students Funded': students_funded[i],
-            'End of Year Cash ($)': f"${data['cash']:,.2f}",
+            'End of Year Cash (€)': f"€{data['cash']:,.2f}",
             'Active Contracts': data['active_contracts'],
             'Total Exits': data['exits']
         })
@@ -2064,8 +2188,8 @@ def update_results(n_clicks, program_type, initial_investment,
         )
     )
     
-    # Create dollars impact graph
-    dollars_fig = go.Figure()
+    # Create euros impact graph
+    euros_fig = go.Figure()
     
     if simulation_mode == 'percentile':
         for percentile in percentiles:
@@ -2074,7 +2198,7 @@ def update_results(n_clicks, program_type, initial_investment,
             # Calculate total earnings gain
             total_earnings_gain = results['student_metrics']['avg_earnings_gain'] * results['students_educated']
             
-            dollars_fig.add_trace(go.Bar(
+            euros_fig.add_trace(go.Bar(
                 x=[percentile],
                 y=[total_earnings_gain],
                 name="Total Earnings Gain",
@@ -2086,16 +2210,16 @@ def update_results(n_clicks, program_type, initial_investment,
         # Calculate total earnings gain
         total_earnings_gain = results['student_metrics']['avg_earnings_gain'] * results['students_educated']
         
-        dollars_fig.add_trace(go.Bar(
+        euros_fig.add_trace(go.Bar(
             x=['Custom Scenario'],
             y=[total_earnings_gain],
             name="Total Earnings Gain",
             marker_color='#4CAF50'
         ))
     
-    dollars_fig.update_layout(
-        title="Total Earnings Gain (Dollars)",
-        yaxis_title="Total Earnings Gain ($)",
+    euros_fig.update_layout(
+        title="Total Earnings Gain (Euros)",
+        yaxis_title="Total Earnings Gain (€)",
         legend=dict(
             orientation="h",
             yanchor="bottom",
@@ -2160,7 +2284,7 @@ def update_results(n_clicks, program_type, initial_investment,
     # Create the figure layout
     isa_vs_givedirectly_fig = go.Figure(data=comparison_data)
     isa_vs_givedirectly_fig.update_layout(
-        title=f"ISA Program vs GiveDirectly: Total Utility from $1M Donation",
+        title=f"ISA Program vs GiveDirectly: Total Utility from €1M Donation",
         yaxis_title="Total Utility (Utils)",
         xaxis_title="Program",
         legend_title="Program Type",
@@ -2204,7 +2328,7 @@ def update_results(n_clicks, program_type, initial_investment,
         )
     )
     
-    return summary_table, tables_div, impact_fig, dollars_fig, cash_flow_table, 'loading-simulation', isa_vs_givedirectly_fig
+    return summary_table, tables_div, impact_fig, euros_fig, cash_flow_table, 'loading-simulation', isa_vs_givedirectly_fig
 
 # Run the app
 if __name__ == '__main__':
