@@ -253,9 +253,9 @@ def create_landing_page():
                     html.Li([html.Strong("Payment Threshold: "), "Students only make payments when their income exceeds €27,000 per year"]),
                     html.Li([html.Strong("Income Share Percentages: "), 
                         html.Ul([
-                            html.Li("University (Uganda): 14% of income above threshold"),
-                            html.Li("Nursing (Kenya): 12% of income above threshold"),
-                            html.Li("Trade (Rwanda): 12% of income above threshold")
+                            html.Li("University (Uganda): 14% of total income after clearing threshold"),
+                            html.Li("Nursing (Kenya): 12% of total income after clearing threshold"),
+                            html.Li("Trade (Rwanda): 12% of total income after clearing threshold")
                         ], style={'paddingLeft': '30px'})
                     ]),
                     html.Li([html.Strong("Payment Caps (maximum total repayment): "), 
@@ -424,6 +424,60 @@ def create_landing_page():
                     html.Li([html.Strong("Current Simplification: "), "Without implementing this network complexity, the model treats repayment decisions as independent events based on individual circumstances"])
                 ], style={'fontSize': '16px', 'lineHeight': '1.6', 'paddingLeft': '30px'}),
                 
+                html.H2("Additional Resources", style={'color': '#2c3e50', 'borderBottom': '1px solid #eee', 'paddingBottom': '10px', 'marginTop': '30px'}),
+                
+                html.H4("Graduation Rate Data Sources", style={'color': '#2c3e50', 'marginTop': '20px'}),
+                html.P([
+                    "Our graduation rate assumptions are based on several key German educational research sources:"
+                ], style={'fontSize': '16px', 'lineHeight': '1.6'}),
+                html.Ul([
+                    html.Li([
+                        html.A("DZHW Brief 05/2022", href="https://www.dzhw.eu/pdf/pub_brief/dzhw_brief_05_2022_anhang.pdf", target="_blank"),
+                        " - The table illustrates a baseline dropout rate of 40% for international students; however, Malengo students currently outperform this benchmark with 95% retention rate due to their specialized support system and rigorous selection process."
+                    ], style={'fontSize': '16px', 'lineHeight': '1.6'}),
+                    html.Li([
+                        html.A("BIBB Data Report 2015 (Vocational Training)", href="https://www.bibb.de/datenreport/de/2015/30777.php", target="_blank"),
+                        " - The table indicates that 32% of non-German students terminate vocational training prior to completing their exams, compared to 13% of students with previous university experience. Approximately 50% of these early terminations result in transfers to alternative programs rather than complete dropouts, leading to an overall dropout rate of roughly 16%. Malengo currently lacks sufficient data to assess these findings independently."
+                    ], style={'fontSize': '16px', 'lineHeight': '1.6'})
+                ], style={'paddingLeft': '30px'}),
+                
+                html.H4("German Profession Names & Salary References", style={'color': '#2c3e50', 'marginTop': '20px'}),
+                html.P([
+                    "Below are the German names for the professions mentioned above, along with specific job examples for each degree type:"
+                ], style={'fontSize': '16px', 'lineHeight': '1.6'}),
+                html.Ul([
+                    html.Li([
+                        html.Strong("Bachelor's Degree (BA) - Bachelorabschluss"), html.Br(),
+                        "Example professions: Chemieingenieur/in (Chemical Engineer), Jurist/in (Lawyer), Wirtschaftsingenieur/in (Business Engineer), Informatiker/in (Computer Scientist)"
+                    ], style={'fontSize': '16px', 'lineHeight': '1.6'}),
+                    html.Li([
+                        html.Strong("Master's Degree (MA) - Masterabschluss"), html.Br(),
+                        "Example professions: Maschinenbauingenieur/in (Mechanical Engineer), Architekt/in (Architect), Betriebswirt/in (Business Administrator), Physiker/in (Physicist)"
+                    ], style={'fontSize': '16px', 'lineHeight': '1.6'}),
+                    html.Li([
+                        html.Strong("Assistant Track (ASST) - Assistenzausbildung"), html.Br(),
+                        "Example professions: Pflegehelfer/in (Nurse Assistant), Altenpflegehelfer/in (Geriatric Nurse Care), Solaranlagenmonteur/in (Solar Installer), Technische/r Assistent/in (Technical Assistant)"
+                    ], style={'fontSize': '16px', 'lineHeight': '1.6'}),
+                    html.Li([
+                        html.Strong("Nursing Degree (NURSE) - Krankenpflegeausbildung"), html.Br(),
+                        "Example professions: Krankenschwester/Krankenpfleger (Nurse), Gesundheits- und Krankenpfleger/in (Healthcare and Nursing Professional)"
+                    ], style={'fontSize': '16px', 'lineHeight': '1.6'}),
+                    html.Li([
+                        html.Strong("Trade Program (TRADE) - Handwerksausbildung"), html.Br(),
+                        "Example professions: Mechatroniker/in (Mechatronics Engineer), Klempner/in (Plumber), Elektriker/in (Electrician), Schreiner/in (Carpenter)"
+                    ], style={'fontSize': '16px', 'lineHeight': '1.6'})
+                ], style={'paddingLeft': '30px'}),
+                
+                html.P([
+                    "Salary reference resources:"
+                ], style={'fontSize': '16px', 'lineHeight': '1.6'}),
+                html.Ul([
+                    html.Li(html.A("German Government Earnings Atlas (Entgeltatlas)", href="https://web.arbeitsagentur.de/entgeltatlas/beruf/134712", target="_blank"), style={'fontSize': '16px', 'lineHeight': '1.6'}),
+                    html.Li(html.A("StepStone Salary Data for Elektroniker", href="https://www.stepstone.de/gehalt/Elektroniker-in.html", target="_blank"), style={'fontSize': '16px', 'lineHeight': '1.6'}),
+                    html.Li(html.A("JobVector Salary Information", href="https://www.jobvector.de/gehalt/Elektroniker/", target="_blank"), style={'fontSize': '16px', 'lineHeight': '1.6'}),
+                    html.Li(html.A("Gehalt.de Profession Data", href="https://www.gehalt.de/beruf/elektroniker-elektronikerin", target="_blank"), style={'fontSize': '16px', 'lineHeight': '1.6'})
+                ], style={'paddingLeft': '30px'}),
+
                 html.Div([
                     html.H4("Modeling Philosophy", style={'color': '#e74c3c', 'marginBottom': '10px'}),
                     html.P([
