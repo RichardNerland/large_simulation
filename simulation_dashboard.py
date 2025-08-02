@@ -37,7 +37,7 @@ counterfactual_params = CounterfactualParams(
 impact_params = ImpactParams(
     discount_rate=0.04,
     counterfactual=counterfactual_params,
-    ppp_multiplier=0.42,
+    ppp_multiplier=0.4,
     health_benefit_per_euro=0.0001,
     migration_influence_factor=0.05,
     moral_weight=1.44
@@ -1078,6 +1078,25 @@ dashboard_layout = html.Div([
                                 ], style={'padding': '10px', 'backgroundColor': '#f9f9f9', 'borderRadius': '5px', 'marginBottom': '15px'}),
                                 html.Div(id='yearly-cash-flow-table')
                             ]),
+                            dcc.Tab(label='NPV PPP Adjusted', children=[
+                                html.Div([
+                                    html.H4("NPV PPP Adjusted Comparison"),
+                                    html.P([
+                                        "This section provides separate analyses of GiveDirectly and Malengo's ISA programs in NPV PPP adjusted terms. "
+                                        
+                                    ])
+                                ], style={'padding': '10px', 'backgroundColor': '#f9f9f9', 'borderRadius': '5px', 'marginBottom': '15px'}),
+                                
+                                # NPV PPP adjusted comparison table
+                                html.Div(id='npv-ppp-table'),
+                                
+                                # NPV PPP adjusted comparison chart  
+                                html.Div([
+                                    html.H4("NPV PPP Adjusted Impact Comparison", style={'marginTop': '30px'}),
+                                    html.P("Direct economic comparison in NPV PPP adjusted terms showing consumption benefits only."),
+                                    dcc.Graph(id='npv-ppp-chart')
+                                ])
+                            ]),
                             dcc.Tab(label='GiveWell Comparison', children=[
                                 html.Div([
                                     html.H4("GiveDirectly Cash Transfer Comparison"),
@@ -1681,7 +1700,9 @@ def toggle_custom_weights(mode):
      Output('euros-impact-graph', 'figure'),
      Output('yearly-cash-flow-table', 'children'),
      Output('loading-simulation', 'parent_className'),
-     Output('isa-vs-givedirectly-chart', 'figure')],
+     Output('isa-vs-givedirectly-chart', 'figure'),
+     Output('npv-ppp-table', 'children'),
+     Output('npv-ppp-chart', 'figure')],
     [Input('run-button', 'n_clicks')],
     [State('program-type', 'value'),
      State('initial-investment', 'value'),
@@ -1696,7 +1717,7 @@ def update_results(n_clicks, program_type, initial_investment,
                   home_prob, unemployment_rate, inflation_rate,
                   stored_weights, simulation_mode):
     if n_clicks == 0:
-        return dash.no_update, dash.no_update, dash.no_update, dash.no_update, dash.no_update, dash.no_update, dash.no_update
+        return dash.no_update, dash.no_update, dash.no_update, dash.no_update, dash.no_update, dash.no_update, dash.no_update, dash.no_update, dash.no_update
     
     # Get weights from stored weights
     stored_weights = stored_weights or {}
@@ -2328,7 +2349,223 @@ def update_results(n_clicks, program_type, initial_investment,
         )
     )
     
-    return summary_table, tables_div, impact_fig, euros_fig, cash_flow_table, 'loading-simulation', isa_vs_givedirectly_fig
+    # Calculate NPV PPP adjusted values for GiveDirectly with corrected calculations
+    # New calculations based on:
+    # - PPP multipliers: Kenya(2.4/1.18), Malawi(2.9/1.18), Mozambique(2.8/1.18), Rwanda(2.8/1.18), Uganda(3.0/1.18)
+    # - Effective Egger adjustment: 1.79
+    # - For 1M EUR: 57% * PPP for year 1 + 71% * PPP + PPP * 79% for spillovers
+    
+    ppp_multipliers = {
+        'Kenya': 2.4 / 1.18,  # 2.034
+        'Malawi': 2.9 / 1.18,  # 2.458
+        'Mozambique': 2.8 / 1.18,  # 2.373
+        'Rwanda': 2.8 / 1.18,  # 2.373
+        'Uganda': 3.0 / 1.18   # 2.542
+    }
+    
+    givedirectly_npv_ppp = {}
+    egger_adjustment = .79
+    
+    for country, ppp_mult in ppp_multipliers.items():
+        # For 1M EUR donation
+        year_1_consumption = 1_000_000 * 0.57 * ppp_mult
+        investment_consumption = 1_000_000 * 0.71 * ppp_mult
+        spillover_effects = 1_000_000 * ppp_mult * egger_adjustment
+        total_impact = year_1_consumption + investment_consumption + spillover_effects
+        givedirectly_npv_ppp[country] = total_impact
+    
+    # Calculate ISA program NPV PPP adjusted values
+    isa_npv_ppp_data = []
+    for percentile in percentiles:
+        results = all_results[percentile]
+        
+        # Calculate remittance benefits (PPP adjusted by 2.5)
+        total_remittance_gain = results['student_metrics']['avg_remittance_gain'] * results['students_educated']
+        remittance_npv_ppp = total_remittance_gain * 2.542
+        
+        # Calculate personal consumption benefits (earnings gain minus remittances)
+        total_earnings_gain = results['student_metrics']['avg_earnings_gain'] * results['students_educated']
+        personal_consumption = total_earnings_gain - total_remittance_gain
+        
+        isa_npv_ppp_data.append({
+            'Scenario': percentile,
+            'Remittance Benefits (NPV PPP)': remittance_npv_ppp,
+            'Personal Consumption Benefits': personal_consumption,
+            'Total NPV PPP Benefits': remittance_npv_ppp + personal_consumption
+        })
+    
+    # Create separate GiveDirectly table
+    givedirectly_table_data = []
+    for country, value in givedirectly_npv_ppp.items():
+        ppp_mult = ppp_multipliers[country]
+        year_1 = 1_000_000 * 0.57 * ppp_mult
+        investments = 1_000_000 * 0.71 * ppp_mult
+        spillovers = 1_000_000 * ppp_mult * egger_adjustment
+        
+        givedirectly_table_data.append({
+            'Country': country,
+            'PPP Multiplier': f"{ppp_mult:.3f}",
+            'Year 1 Consumption (€)': f"€{year_1:,.0f}",
+            'Investment Benefits (€)': f"€{investments:,.0f}",
+            'Spillover Effects (€)': f"€{spillovers:,.0f}",
+            'Total Impact (€)': f"€{value:,.0f}"
+        })
+    
+    givedirectly_df = pd.DataFrame(givedirectly_table_data)
+    
+    givedirectly_table = html.Div([
+        html.H4("GiveDirectly NPV PPP Adjusted Impact", style={'marginTop': '20px'}),
+        html.P([
+            "This table shows the corrected GiveDirectly impact calculations using: ",
+            "Year 1 (57% × PPP), Year 2-20 Investments (71% × PPP), ",
+            "and Spillover Effects (79% × PPP). Based on 1M EUR donation."
+        ], style={'fontSize': '14px', 'marginBottom': '15px', 'fontStyle': 'italic'}),
+        dash_table.DataTable(
+            id='givedirectly-table',
+            columns=[
+                {"name": "Country", "id": "Country"},
+                {"name": "PPP Multiplier", "id": "PPP Multiplier"},
+                {"name": "Year 1 Consumption (€)", "id": "Year 1 Consumption (€)"},
+                {"name": "Investment Benefits (€)", "id": "Investment Benefits (€)"},
+                {"name": "Spillover Effects (€)", "id": "Spillover Effects (€)"},
+                {"name": "Total Impact (€)", "id": "Total Impact (€)"}
+            ],
+            data=givedirectly_df.to_dict('records'),
+            style_cell={'textAlign': 'center'},
+            style_header={
+                'backgroundColor': 'rgb(52, 152, 219, 0.2)',
+                'fontWeight': 'bold'
+            },
+            style_data={
+                'backgroundColor': 'rgba(52, 152, 219, 0.1)',
+            }
+        )
+    ])
+
+    # Create separate Malengo (ISA) table
+    malengo_table_data = []
+    for data in isa_npv_ppp_data:
+        scenario_label = data['Scenario'].upper() if data['Scenario'] != 'Custom' else 'Custom'
+        malengo_table_data.append({
+            'Scenario': scenario_label,
+            'Personal Consumption (€)': f"€{data['Personal Consumption Benefits']:,.0f}",
+            'Remittance Benefits (€)': f"€{data['Remittance Benefits (NPV PPP)']:,.0f}",
+            'Total NPV PPP (€)': f"€{data['Total NPV PPP Benefits']:,.0f}"
+        })
+    
+    malengo_df = pd.DataFrame(malengo_table_data)
+    
+    malengo_table = html.Div([
+        html.H4("Malengo ISA Program NPV PPP Adjusted Impact", style={'marginTop': '30px'}),
+        html.P([
+            f"This table shows the {program_type} ISA program benefits split into personal consumption ",
+            "and remittance benefits (PPP adjusted)."
+        ], style={'fontSize': '14px', 'marginBottom': '15px', 'fontStyle': 'italic'}),
+        dash_table.DataTable(
+            id='malengo-table',
+            columns=[
+                {"name": "Scenario", "id": "Scenario"},
+                {"name": "Personal Consumption (€)", "id": "Personal Consumption (€)"},
+                {"name": "Remittance Benefits (€)", "id": "Remittance Benefits (€)"},
+                {"name": "Total NPV PPP (€)", "id": "Total NPV PPP (€)"}
+            ],
+            data=malengo_df.to_dict('records'),
+            style_cell={'textAlign': 'center'},
+            style_header={
+                'backgroundColor': 'rgb(156, 89, 182, 0.2)',
+                'fontWeight': 'bold'
+            },
+            style_data={
+                'backgroundColor': 'rgba(156, 89, 182, 0.1)',
+            }
+        )
+    ])
+    
+    # Combine both tables
+    npv_ppp_table = html.Div([
+        givedirectly_table,
+        malengo_table
+    ])
+    
+    # Create NPV PPP comparison chart
+    npv_ppp_fig = go.Figure()
+    
+    # Add GiveDirectly bars
+    countries = list(givedirectly_npv_ppp.keys())
+    values = list(givedirectly_npv_ppp.values())
+    
+    npv_ppp_fig.add_trace(go.Bar(
+        x=[f'GiveDirectly ({country})' for country in countries],
+        y=values,
+        name='GiveDirectly (Consumption Benefits)',
+        marker_color='#3498db'
+    ))
+    
+    # Add ISA program bars
+    for data in isa_npv_ppp_data:
+        scenario_label = data['Scenario'].upper() if data['Scenario'] != 'Custom' else 'Custom'
+        program_name = f'{program_type} ({scenario_label})'
+        
+        # Stack remittance and personal consumption
+        npv_ppp_fig.add_trace(go.Bar(
+            x=[program_name],
+            y=[data['Personal Consumption Benefits']],
+            name='Personal Consumption' if data == isa_npv_ppp_data[0] else None,
+            marker_color='#2ecc71',
+            showlegend=data == isa_npv_ppp_data[0]
+        ))
+        
+        npv_ppp_fig.add_trace(go.Bar(
+            x=[program_name], 
+            y=[data['Remittance Benefits (NPV PPP)']],
+            name='Remittance Benefits (PPP Adj.)' if data == isa_npv_ppp_data[0] else None,
+            marker_color='#9b59b6',
+            showlegend=data == isa_npv_ppp_data[0]
+        ))
+    
+    # Add a horizontal line showing 10x Uganda benchmark
+    uganda_benchmark_value = givedirectly_npv_ppp['Uganda'] * 10
+    
+    npv_ppp_fig.add_shape(
+        type="line",
+        x0=-0.5,
+        y0=uganda_benchmark_value,
+        x1=len(countries) + len(isa_npv_ppp_data) - 0.5,
+        y1=uganda_benchmark_value,
+        line=dict(
+            color="red",
+            width=2,
+            dash="dash",
+        )
+    )
+    
+    # Add annotation for the benchmark line
+    npv_ppp_fig.add_annotation(
+        x=len(countries) + len(isa_npv_ppp_data) - 1,
+        y=uganda_benchmark_value * 1.05,
+        text="10x Uganda Benchmark",
+        showarrow=False,
+        font=dict(
+            color="red",
+            size=12
+        )
+    )
+    
+    npv_ppp_fig.update_layout(
+        title="NPV PPP Adjusted Economic Impact Comparison",
+        yaxis_title="NPV PPP Adjusted Benefits (€)",
+        xaxis_title="Program",
+        barmode='stack',
+        legend=dict(
+            orientation="h",
+            yanchor="bottom", 
+            y=1.02,
+            xanchor="right",
+            x=1
+        )
+    )
+    
+    return summary_table, tables_div, impact_fig, euros_fig, cash_flow_table, 'loading-simulation', isa_vs_givedirectly_fig, npv_ppp_table, npv_ppp_fig
 
 # Run the app
 if __name__ == '__main__':

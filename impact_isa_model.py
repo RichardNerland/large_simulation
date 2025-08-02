@@ -62,7 +62,7 @@ class ImpactParams:
     """Parameters for measuring social impact"""
     discount_rate: float  # Annual discount rate for utility calculations
     counterfactual: CounterfactualParams
-    ppp_multiplier: float = 0.42  # Purchasing power parity multiplier for German to Ugandan earnings
+    ppp_multiplier: float = 0.4  # Purchasing power parity multiplier for German to Ugandan earnings
     health_benefit_per_euro: float = 0.00003  # Health utility gained per euro of additional income (based on GiveWell's approach)
     migration_influence_factor: float = 0.05  # Additional people who migrate due to observing success
     moral_weight: float = 1.44  # Moral weight (alpha) for direct income effects, based on GiveWell's approach
@@ -278,7 +278,7 @@ class Student:
         remittance_utility_gain = remittance_utility - counterfactual_remittance_utility
         
         # Calculate PPP-adjusted earnings gain (applying PPP multiplier to convert German earnings to Ugandan equivalent)
-        ppp_adjusted_earnings_gain = earnings_gain * 0.42
+        ppp_adjusted_earnings_gain = earnings_gain * 0.4
         
         # Calculate health benefits using GiveWell's approach
         # Life expectancy improvement from 62 to 81 years (19 years)
