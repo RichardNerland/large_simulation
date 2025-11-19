@@ -28,9 +28,9 @@ from landing_page import create_landing_page
 
 # Set up default impact parameters
 counterfactual_params = CounterfactualParams(
-    base_earnings=2400,
+    base_earnings=511,
     earnings_growth=0.01,
-    remittance_rate=0.15,
+    remittance_rate=0.0,
     employment_rate=0.7
 )
 
@@ -713,7 +713,7 @@ def precompute_percentile_scenarios():
                 impact_params=impact_params,
                 num_sims=1,
                 scenario='baseline',
-                remittance_rate=0.1,
+                remittance_rate=0.08,
                 home_prob=0.1,  # Fixed at 10%
                 degree_params=degree_params,
                 initial_unemployment_rate=0.08,  # Fixed at 8%
@@ -1856,7 +1856,7 @@ def update_results(n_clicks, program_type, initial_investment,
             impact_params=impact_params,
             num_sims=1,
             scenario='baseline',
-            remittance_rate=0.1,
+            remittance_rate=0.08,
             home_prob=home_prob,
             degree_params=degree_params,
             initial_unemployment_rate=unemployment_rate,

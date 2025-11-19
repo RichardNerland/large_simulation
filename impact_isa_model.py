@@ -234,7 +234,7 @@ class Student:
             return 0
         
         # Fixed base value that grows with inflation
-        return 2400 * year.deflator
+        return 511 * year.deflator
 
     def calculate_utility(self, income: float, alpha: float) -> float:
         """Calculate utility for a given income level."""
@@ -247,8 +247,8 @@ class Student:
         total_counterfactual = np.sum(self.counterfactual_earnings / year.deflator)
         earnings_gain = total_earnings - total_counterfactual
         
-        # Calculate remittances (15% of earnings) in real terms
-        remittance_rate = 0.15
+        # Calculate remittances (8% of earnings) in real terms
+        remittance_rate = 0.08
         remittances = self.earnings * remittance_rate / year.deflator
         counterfactual_remittances = self.counterfactual_earnings * remittance_rate / year.deflator
         remittance_gain = np.sum(remittances) - np.sum(counterfactual_remittances)
@@ -645,7 +645,7 @@ def simulate_impact(
     impact_params: ImpactParams,
     num_sims: int = 1,
     scenario: str = 'baseline',
-    remittance_rate: float = 0.15,
+    remittance_rate: float = 0.08,
     home_prob: float = 0.1,
     data_callback: Optional[Callable] = None,
     isa_percentage: Optional[float] = None,
@@ -1359,9 +1359,9 @@ def main():
     impact_params = ImpactParams(
         discount_rate=0.04,
         counterfactual=CounterfactualParams(
-            base_earnings=2200,
+            base_earnings=511,
             earnings_growth=0.01,
-            remittance_rate=0.15,
+            remittance_rate=0.0,
             employment_rate=0.9
         ),
         ppp_multiplier=0.42,
