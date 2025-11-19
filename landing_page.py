@@ -188,7 +188,7 @@ def create_landing_page():
                 
                 html.H3("Step 3: Run Simulation", style={'color': '#2c3e50', 'marginTop': '25px'}),
                 html.P([
-                    "Click 'Run Simulation' to generate results. The initial investment is fixed at €1,000,000, and the number of students funded ",
+                    "Click 'Run Simulation' to generate results. The initial investment is fixed at $1,000,000, and the number of students funded ",
                     "is calculated automatically based on the program-specific cost per student."
                 ], style={'fontSize': '16px', 'lineHeight': '1.6'}),
                 
