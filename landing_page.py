@@ -275,9 +275,9 @@ def create_landing_page():
                 ], style={'fontSize': '16px', 'lineHeight': '1.6'}),
                 
                 html.Ul([
-                    html.Li([html.Strong("University (Uganda): "), "€29,000 per student"]),
-                    html.Li([html.Strong("Nursing (Kenya): "), "€16,650 per student"]),
-                    html.Li([html.Strong("Trade (Rwanda): "), "€16,650 per student"])
+                    html.Li([html.Strong("University (Uganda): "), "$29,050 per student"]),
+                    html.Li([html.Strong("Nursing (Kenya): "), "$16,650 per student"]),
+                    html.Li([html.Strong("Trade (Rwanda): "), "$16,650 per student"])
                 ], style={'fontSize': '16px', 'lineHeight': '1.6', 'paddingLeft': '30px'}),
                 
                 html.H3("Degree Track Parameters", style={'color': '#2c3e50', 'marginTop': '25px'}),
