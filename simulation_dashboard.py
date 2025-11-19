@@ -152,7 +152,7 @@ def create_degree_params(percentile, program_type):
                 ), 0.35),
                 (DegreeParams(
                     name='NA',
-                    initial_salary=2200,
+                    initial_salary=1100,
                     salary_std=640,
                     annual_growth=0.01,
                     years_to_complete=2,
@@ -187,8 +187,8 @@ def create_degree_params(percentile, program_type):
                 ), 0.35),
                 (DegreeParams(
                     name='NA',
-                    initial_salary=2200,
-                    salary_std=640,
+                    initial_salary=1100,
+                    salary_std=100,
                     annual_growth=0.01,
                     years_to_complete=2,
                     home_prob=1.0
@@ -222,8 +222,8 @@ def create_degree_params(percentile, program_type):
                 ), 0.27),
                 (DegreeParams(
                     name='NA',
-                    initial_salary=2200,
-                    salary_std=640,
+                    initial_salary=1100,
+                    salary_std=100,
                     annual_growth=0.01,
                     years_to_complete=2,
                     home_prob=1.0
@@ -257,8 +257,8 @@ def create_degree_params(percentile, program_type):
                 ), 0.18),
                 (DegreeParams(
                     name='NA',
-                    initial_salary=2200,
-                    salary_std=640,
+                    initial_salary=1100,
+                    salary_std=100,
                     annual_growth=0.01,
                     years_to_complete=2,
                     home_prob=1.0
@@ -292,8 +292,8 @@ def create_degree_params(percentile, program_type):
                 ), 0.01),
                 (DegreeParams(
                     name='NA',
-                    initial_salary=2200,
-                    salary_std=640,
+                    initial_salary=1100,
+                    salary_std=100,
                     annual_growth=0.01,
                     years_to_complete=2,
                     home_prob=1.0
@@ -329,8 +329,8 @@ def create_degree_params(percentile, program_type):
                 ), 0.20),
                 (DegreeParams(
                     name='NA',
-                    initial_salary=2200,
-                    salary_std=640,
+                    initial_salary=1100,
+                    salary_std=100,
                     annual_growth=0.01,
                     years_to_complete=2,
                     home_prob=1.0
@@ -364,8 +364,8 @@ def create_degree_params(percentile, program_type):
                 ), 0.25),
                 (DegreeParams(
                     name='NA',
-                    initial_salary=2200,
-                    salary_std=640,
+                    initial_salary=1100,
+                    salary_std=100,
                     annual_growth=0.01,
                     years_to_complete=2,
                     home_prob=1.0
@@ -399,8 +399,8 @@ def create_degree_params(percentile, program_type):
                 ), 0.20),
                 (DegreeParams(
                     name='NA',
-                    initial_salary=2200,
-                    salary_std=640,
+                    initial_salary=1100,
+                    salary_std=100,
                     annual_growth=0.01,
                     years_to_complete=2,
                     home_prob=1.0
@@ -434,8 +434,8 @@ def create_degree_params(percentile, program_type):
                 ), 0.10),
                 (DegreeParams(
                     name='NA',
-                    initial_salary=2200,
-                    salary_std=640,
+                    initial_salary=1100,
+                    salary_std=100,
                     annual_growth=0.01,
                     years_to_complete=2,
                     home_prob=1.0
@@ -469,8 +469,8 @@ def create_degree_params(percentile, program_type):
                 ), 0.05),
                 (DegreeParams(
                     name='NA',
-                    initial_salary=2200,
-                    salary_std=640,
+                    initial_salary=1100,
+                    salary_std=100,
                     annual_growth=0.01,
                     years_to_complete=2,
                     home_prob=1.0
@@ -506,8 +506,8 @@ def create_degree_params(percentile, program_type):
                 ), 0.15),
                 (DegreeParams(
                     name='NA',
-                    initial_salary=2200,
-                    salary_std=640,
+                    initial_salary=1100,
+                    salary_std=100,
                     annual_growth=0.01,
                     years_to_complete=2,
                     home_prob=1.0
@@ -541,8 +541,8 @@ def create_degree_params(percentile, program_type):
                 ), 0.20),
                 (DegreeParams(
                     name='NA',
-                    initial_salary=2200,
-                    salary_std=640,
+                    initial_salary=1100,
+                    salary_std=100,
                     annual_growth=0.01,
                     years_to_complete=2,
                     home_prob=1.0
@@ -576,8 +576,8 @@ def create_degree_params(percentile, program_type):
                 ), 0.15),
                 (DegreeParams(
                     name='NA',
-                    initial_salary=2200,
-                    salary_std=640,
+                    initial_salary=1100,
+                    salary_std=100,
                     annual_growth=0.01,
                     years_to_complete=2,
                     home_prob=1.0
@@ -611,8 +611,8 @@ def create_degree_params(percentile, program_type):
                 ), 0.10),
                 (DegreeParams(
                     name='NA',
-                    initial_salary=2200,
-                    salary_std=640,
+                    initial_salary=1100,
+                    salary_std=100,
                     annual_growth=0.01,
                     years_to_complete=2,
                     home_prob=1.0
@@ -646,8 +646,8 @@ def create_degree_params(percentile, program_type):
                 ), 0.05),
                 (DegreeParams(
                     name='NA',
-                    initial_salary=2200,
-                    salary_std=640,
+                    initial_salary=1100,
+                    salary_std=100,
                     annual_growth=0.01,
                     years_to_complete=2,
                     home_prob=1.0
@@ -800,8 +800,8 @@ def create_custom_degree_params(program_type, ba_weight=None, ma_weight=None, as
             ), asst_shift_pct),
             (DegreeParams(
                 name='NA',
-                initial_salary=2200,
-                salary_std=640,
+                initial_salary=1100,
+                salary_std=100,
                 annual_growth=0.01,
                 years_to_complete=2,
                 home_prob=1.0
@@ -854,8 +854,8 @@ def create_custom_degree_params(program_type, ba_weight=None, ma_weight=None, as
             ), asst_shift_pct),
             (DegreeParams(
                 name='NA',
-                initial_salary=2200,
-                salary_std=640,
+                initial_salary=1100,
+                salary_std=100,
                 annual_growth=0.01,
                 years_to_complete=2,
                 home_prob=1.0
@@ -908,8 +908,8 @@ def create_custom_degree_params(program_type, ba_weight=None, ma_weight=None, as
             ), asst_shift_pct),
             (DegreeParams(
                 name='NA',
-                initial_salary=2200,
-                salary_std=640,
+                initial_salary=1100,
+                salary_std=100,
                 annual_growth=0.01,
                 years_to_complete=2,
                 home_prob=1.0

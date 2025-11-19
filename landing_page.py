@@ -328,8 +328,8 @@ def create_landing_page():
                     html.Li([html.Strong("Discount Rate: "), "4% annually for present value calculations"]),
                     html.Li([html.Strong("Investment Buffer: "), "2% of initial investment reserved as cash buffer"]),
                     html.Li([html.Strong("PPP Multiplier: "), "0.4 purchasing power parity adjustment for German to home country earnings"]),
-                    html.Li([html.Strong("Counterfactual Baseline: "), "€2,400/year base earnings without migration, 1% annual growth"]),
-                    html.Li([html.Strong("Remittance Rate: "), "15% of income sent as remittances to home country"]),
+                    html.Li([html.Strong("Counterfactual Baseline: "), "€2,400/year base earnings without migration, 1% annual growth, with HH size 4"]),
+                    html.Li([html.Strong("Remittance Rate: "), "8% of income sent as remittances to home country"]),
                     html.Li([html.Strong("Health Benefits: "), "0.00003 health utility per euro of additional income (based on GiveWell methodology)"]),
                     html.Li([html.Strong("Migration Influence: "), "5% factor for spillover effects from observing migration success"]),
                     html.Li([html.Strong("Moral Weight: "), "Value of 1 is the value of doubling consumption for one person for one year, alpha parameter for direct income effects (GiveWell framework)"])

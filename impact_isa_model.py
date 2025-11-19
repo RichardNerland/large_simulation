@@ -1144,7 +1144,7 @@ def get_degree_for_scenario(scenario: str, program_type: str, home_prob: float, 
             ), asst_shift_percentage),  # ~20% ASST_SHIFT
             (DegreeParams(
                 name='NA',
-                initial_salary=2200,
+                initial_salary=1100,
                 salary_std=640,
                 annual_growth=0.01,
                 years_to_complete=2,
@@ -1185,8 +1185,8 @@ def get_degree_for_scenario(scenario: str, program_type: str, home_prob: float, 
             ), asst_shift_percentage),  # ~13% ASST_SHIFT
             (DegreeParams(
                 name='NA',
-                initial_salary=2200,
-                salary_std=640,
+                initial_salary=1100,
+                salary_std=100,
                 annual_growth=0.01,
                 years_to_complete=2,
                 home_prob=1.0  # Fixed high home probability for NA
