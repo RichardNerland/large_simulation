@@ -708,7 +708,7 @@ def precompute_percentile_scenarios():
             # Run simulation with fixed parameters
             results = simulate_impact(
                 program_type=program_type,
-                initial_investment=1000000,  # Fixed at €1M
+                initial_investment=1000000,  
                 num_years=45,
                 impact_params=impact_params,
                 num_sims=1,
@@ -967,8 +967,8 @@ dashboard_layout = html.Div([
             ], style={'marginBottom': '20px'}),
             
             html.Div([
-                html.Label("Initial Investment (€):", style={'fontWeight': 'bold', 'marginBottom': '5px', 'display': 'block'}),
-                html.Div("€1,000,000 (fixed)", style={'width': '100%', 'padding': '8px', 'borderRadius': '5px', 
+                html.Label("Initial Investment ($):", style={'fontWeight': 'bold', 'marginBottom': '5px', 'display': 'block'}),
+                html.Div("$1,000,000 (fixed)", style={'width': '100%', 'padding': '8px', 'borderRadius': '5px', 
                                                      'border': '1px solid #ddd', 'backgroundColor': '#f5f5f5',
                                                      'fontStyle': 'italic'})
             ], style={'marginBottom': '20px'}),
@@ -1056,16 +1056,16 @@ dashboard_layout = html.Div([
                                 ], style={'padding': '10px', 'backgroundColor': '#f9f9f9', 'borderRadius': '5px', 'marginBottom': '15px'}),
                                 dcc.Graph(id='impact-metrics-graph')
                             ]),
-                            dcc.Tab(label='Impact Metrics (Euros)', children=[
+                            dcc.Tab(label='Impact Metrics', children=[
                                 html.Div([
-                                    html.H4("Understanding Impact Metrics in Euros"),
+                                    html.H4("Understanding Impact Metrics"),
                                     html.P([
-                                        "This graph shows the total earnings gain (in euros) generated across different percentile scenarios. ",
+                                        "This graph shows the total earnings gain  generated across different percentile scenarios. ",
                                         "It represents the direct financial impact of the program on students' lifetime earnings. ",
                                         "This metric helps assess the economic return on investment from the program."
                                     ])
                                 ], style={'padding': '10px', 'backgroundColor': '#f9f9f9', 'borderRadius': '5px', 'marginBottom': '15px'}),
-                                dcc.Graph(id='euros-impact-graph')
+                                dcc.Graph(id='impact-graph')
                             ]),
                             dcc.Tab(label='Yearly Cash Flow', children=[
                                 html.Div([
@@ -1102,14 +1102,14 @@ dashboard_layout = html.Div([
                                     html.H4("GiveDirectly Cash Transfer Comparison"),
                                                                     html.P([
                                     "This section compares the impact of a $1,000,000 donation to GiveDirectly's Cash for Poverty Relief program across different countries. ",
-                                    "The data is based on GiveWell's latest cost-effectiveness analysis showing how €1 million would create value in different dimensions. ",
+                                    "The data is based on GiveWell's latest cost-effectiveness analysis showing how $1 million would create value in different dimensions. ",
                                     "This provides a benchmark for comparing our program's impact against a proven effective intervention."
                                 ])
                                 ], style={'padding': '10px', 'backgroundColor': '#f9f9f9', 'borderRadius': '5px', 'marginBottom': '15px'}),
                                 
                                 # GiveWell cash transfer data table
                                 html.Div([
-                                    html.H4("€1M to GiveDirectly: Cost-Effectiveness Analysis (CEA)"),
+                                    html.H4("$1M to GiveDirectly: Cost-Effectiveness Analysis (CEA)"),
                                     html.P("Breakdown of bottom-line value from GiveWell's latest analysis of GiveDirectly's Cash for Poverty Relief program"),
                                     
                                     # Create the table using dash_table
@@ -1129,7 +1129,7 @@ dashboard_layout = html.Div([
                                             {"category": "Mortality benefits", "kenya": 1065, "malawi": 1131, "mozambique": 1739, "rwanda": 856, "uganda": 1188},
                                             {"category": "Additional benefits and downsides", "kenya": 648, "malawi": 949, "mozambique": 915, "rwanda": 818, "uganda": 685},
                                             {"category": "Total units of value", "kenya": 8742, "malawi": 12810, "mozambique": 12349, "rwanda": 11040, "uganda": 9249},
-                                            {"category": "Units of value per €", "kenya": 0.009, "malawi": 0.013, "mozambique": 0.012, "rwanda": 0.011, "uganda": 0.009},
+                                            {"category": "Units of value per $", "kenya": 0.009, "malawi": 0.013, "mozambique": 0.012, "rwanda": 0.011, "uganda": 0.009},
                                         ],
                                         style_cell={'textAlign': 'center'},
                                         style_header={
@@ -1213,7 +1213,7 @@ dashboard_layout = html.Div([
                                                     }
                                                 ],
                                                 'layout': {
-                                                    'title': 'Value Distribution of €1M Donation to GiveDirectly by Country',
+                                                    'title': 'Value Distribution of $1M Donation to GiveDirectly by Country',
                                                     'barmode': 'stack',
                                                     'xaxis': {'title': 'Country'},
                                                     'yaxis': {'title': 'Units of Value'}
@@ -1225,7 +1225,7 @@ dashboard_layout = html.Div([
                                     # Add direct comparison chart (dynamically updated with simulation results)
                                     html.Div([
                                         html.H4("Direct Comparison: ISA Program vs GiveDirectly", style={'marginTop': '30px'}),
-                                        html.P("This chart compares the total utility value generated by our program versus GiveDirectly's Cash for Poverty Relief program for a €1M donation."),
+                                        html.P("This chart compares the total utility value generated by our program versus GiveDirectly's Cash for Poverty Relief program for a $1M donation."),
                                         dcc.Graph(id='isa-vs-givedirectly-chart')
                                     ]),
                                     
@@ -1234,7 +1234,7 @@ dashboard_layout = html.Div([
                                         html.P([
                                             "The units of value in GiveWell's analysis represent welfare benefits, adjusted with moral weights. ",
                                             "A key benchmark is that GiveWell typically considers a program to be cost-effective if it achieves 10x the value per euro compared to direct cash transfers. ",
-                                            "The values shown for GiveDirectly represent what €1 million would achieve if donated directly to their Cash for Poverty Relief program."
+                                            "The values shown for GiveDirectly represent what $1 million would achieve if donated directly to their Cash for Poverty Relief program."
                                         ]),
                                         html.P([
                                             "Source: GiveWell's 2024 cost-effectiveness analysis of GiveDirectly's Cash for Poverty Relief program. ",
@@ -1505,9 +1505,9 @@ def update_calculated_students(program_type):
     initial_students = int(available_for_students / price_per_student)
     
     return html.Div([
-        html.P(f"{program_name} Program - Price per student: €{price_per_student:,.2f}", style={'marginBottom': '5px'}),
+        html.P(f"{program_name} Program - Price per student: ${price_per_student:,.2f}", style={'marginBottom': '5px'}),
         html.P([
-            f"Initial investment: €{initial_investment:,} (fixed)",
+            f"Initial investment: ${initial_investment:,} (fixed)",
             html.Br(),
             f"Initial students that can be funded: {initial_students}"
         ], style={'fontWeight': 'bold'})
@@ -1697,7 +1697,7 @@ def toggle_custom_weights(mode):
     [Output('simulation-results', 'children'),
      Output('percentile-tables', 'children'),
      Output('impact-metrics-graph', 'figure'),
-     Output('euros-impact-graph', 'figure'),
+     Output('impact-graph', 'figure'),
      Output('yearly-cash-flow-table', 'children'),
      Output('loading-simulation', 'parent_className'),
      Output('isa-vs-givedirectly-chart', 'figure'),
@@ -1883,7 +1883,7 @@ def update_results(n_clicks, program_type, initial_investment,
             'Scenario': percentile,
             'IRR (%)': f"{results['irr']*100:.2f}%",
             'Students Educated': results['students_educated'],
-            'Avg Earnings Gain (€)': f"€{results['student_metrics']['avg_earnings_gain']:,.2f}"
+            'Avg Earnings Gain': f"{results['student_metrics']['avg_earnings_gain']:,.2f}"
         })
     
     summary_df = pd.DataFrame(summary_data)
@@ -1903,7 +1903,7 @@ def update_results(n_clicks, program_type, initial_investment,
         html.Div([
             html.H4("Simulation Information"),
             html.P(f"Program Type: {program_type}"),
-            html.P(f"Initial Investment: €{initial_investment:,}"),
+            html.P(f"Initial Investment: ${initial_investment:,}"),
             html.P(f"Simulation Length: 45 years")
         ], style={'marginTop': '20px'})
     ])
@@ -1986,8 +1986,8 @@ def update_results(n_clicks, program_type, initial_investment,
             'Scenario': percentile,
             'IRR (%)': f"{results['irr']*100:.2f}%",
             'Students Educated': results['students_educated'],
-            'Cost per Student (€)': f"€{initial_investment / results['students_educated']:,.2f}",
-            'Avg Payment (€)': f"€{avg_payment:,.2f}",
+            'Cost per Student ($)': f"${initial_investment / results['students_educated']:,.2f}",
+            'Avg Payment ($)': f"${avg_payment:,.2f}",
             'Payment Cap (%)': f"{payment_cap_exits/total_contracts*100:.1f}%" if total_contracts > 0 else "0%",
             'Years Cap (%)': f"{years_cap_exits/total_contracts*100:.1f}%" if total_contracts > 0 else "0%",
             'Other Exits (%)': f"{other_exits/total_contracts*100:.1f}%" if total_contracts > 0 else "0%"
@@ -2021,8 +2021,8 @@ def update_results(n_clicks, program_type, initial_investment,
         results = all_results[percentile]
         impact_data.append({
             'Scenario': percentile,
-            'Avg Earnings Gain (€)': f"€{results['student_metrics']['avg_earnings_gain']:,.2f}",
-            'Avg Remittance Gain (€)': f"€{results['student_metrics']['avg_remittance_gain']:,.2f}"
+            'Avg Earnings Gain': f"{results['student_metrics']['avg_earnings_gain']:,.2f}",
+            'Avg Remittance Gain': f"{results['student_metrics']['avg_remittance_gain']:,.2f}"
         })
     
     impact_df = pd.DataFrame(impact_data)
@@ -2104,10 +2104,10 @@ def update_results(n_clicks, program_type, initial_investment,
         
         cash_flow_data.append({
             'Year': data['year'],
-            'Start of Year Cash (€)': f"€{start_cash:,.2f}",
-            'Cash Flow from Repayments (€)': f"€{data['returns']:,.2f}",
+            'Start of Year Cash ($)': f"${start_cash:,.2f}",
+            'Cash Flow from Repayments ($)': f"${data['returns']:,.2f}",
             'Students Funded': students_funded[i],
-            'End of Year Cash (€)': f"€{data['cash']:,.2f}",
+            'End of Year Cash ($)': f"${data['cash']:,.2f}",
             'Active Contracts': data['active_contracts'],
             'Total Exits': data['exits']
         })
@@ -2209,7 +2209,7 @@ def update_results(n_clicks, program_type, initial_investment,
         )
     )
     
-    # Create euros impact graph
+    # Create impact graph
     euros_fig = go.Figure()
     
     if simulation_mode == 'percentile':
@@ -2239,8 +2239,8 @@ def update_results(n_clicks, program_type, initial_investment,
         ))
     
     euros_fig.update_layout(
-        title="Total Earnings Gain (Euros)",
-        yaxis_title="Total Earnings Gain (€)",
+        title="Total Earnings Gain",
+        yaxis_title="Total Earnings Gain",
         legend=dict(
             orientation="h",
             yanchor="bottom",
@@ -2305,7 +2305,7 @@ def update_results(n_clicks, program_type, initial_investment,
     # Create the figure layout
     isa_vs_givedirectly_fig = go.Figure(data=comparison_data)
     isa_vs_givedirectly_fig.update_layout(
-        title=f"ISA Program vs GiveDirectly: Total Utility from €1M Donation",
+        title=f"ISA Program vs GiveDirectly: Total Utility from $1M Donation",
         yaxis_title="Total Utility (Utils)",
         xaxis_title="Program",
         legend_title="Program Type",
@@ -2405,10 +2405,10 @@ def update_results(n_clicks, program_type, initial_investment,
         givedirectly_table_data.append({
             'Country': country,
             'PPP Multiplier': f"{ppp_mult:.3f}",
-            'Year 1 Consumption (€)': f"€{year_1:,.0f}",
-            'Investment Benefits (€)': f"€{investments:,.0f}",
-            'Spillover Effects (€)': f"€{spillovers:,.0f}",
-            'Total Impact (€)': f"€{value:,.0f}"
+            'Year 1 Consumption': f"{year_1:,.0f}",
+            'Investment Benefits': f"{investments:,.0f}",
+            'Spillover Effects': f"{spillovers:,.0f}",
+            'Total Impact': f"{value:,.0f}"
         })
     
     givedirectly_df = pd.DataFrame(givedirectly_table_data)
@@ -2425,10 +2425,10 @@ def update_results(n_clicks, program_type, initial_investment,
             columns=[
                 {"name": "Country", "id": "Country"},
                 {"name": "PPP Multiplier", "id": "PPP Multiplier"},
-                {"name": "Year 1 Consumption (€)", "id": "Year 1 Consumption (€)"},
-                {"name": "Investment Benefits (€)", "id": "Investment Benefits (€)"},
-                {"name": "Spillover Effects (€)", "id": "Spillover Effects (€)"},
-                {"name": "Total Impact (€)", "id": "Total Impact (€)"}
+                {"name": "Year 1 Consumption", "id": "Year 1 Consumption"},
+                {"name": "Investment Benefits", "id": "Investment Benefits"},
+                {"name": "Spillover Effects", "id": "Spillover Effects"},
+                {"name": "Total Impact", "id": "Total Impact"}
             ],
             data=givedirectly_df.to_dict('records'),
             style_cell={'textAlign': 'center'},
@@ -2448,9 +2448,9 @@ def update_results(n_clicks, program_type, initial_investment,
         scenario_label = data['Scenario'].upper() if data['Scenario'] != 'Custom' else 'Custom'
         malengo_table_data.append({
             'Scenario': scenario_label,
-            'Personal Consumption (€)': f"€{data['Personal Consumption Benefits']:,.0f}",
-            'Remittance Benefits (€)': f"€{data['Remittance Benefits (NPV PPP)']:,.0f}",
-            'Total NPV PPP (€)': f"€{data['Total NPV PPP Benefits']:,.0f}"
+            'Personal Consumption': f"{data['Personal Consumption Benefits']:,.0f}",
+            'Remittance Benefits': f"{data['Remittance Benefits (NPV PPP)']:,.0f}",
+            'Total NPV PPP': f"{data['Total NPV PPP Benefits']:,.0f}"
         })
     
     malengo_df = pd.DataFrame(malengo_table_data)
@@ -2465,9 +2465,9 @@ def update_results(n_clicks, program_type, initial_investment,
             id='malengo-table',
             columns=[
                 {"name": "Scenario", "id": "Scenario"},
-                {"name": "Personal Consumption (€)", "id": "Personal Consumption (€)"},
-                {"name": "Remittance Benefits (€)", "id": "Remittance Benefits (€)"},
-                {"name": "Total NPV PPP (€)", "id": "Total NPV PPP (€)"}
+                {"name": "Personal Consumption", "id": "Personal Consumption"},
+                {"name": "Remittance Benefits", "id": "Remittance Benefits"},
+                {"name": "Total NPV PPP", "id": "Total NPV PPP"}
             ],
             data=malengo_df.to_dict('records'),
             style_cell={'textAlign': 'center'},
@@ -2553,7 +2553,7 @@ def update_results(n_clicks, program_type, initial_investment,
     
     npv_ppp_fig.update_layout(
         title="NPV PPP Adjusted Economic Impact Comparison",
-        yaxis_title="NPV PPP Adjusted Benefits (€)",
+        yaxis_title="NPV PPP Adjusted Benefits",
         xaxis_title="Program",
         barmode='stack',
         legend=dict(
