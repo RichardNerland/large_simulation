@@ -1347,8 +1347,8 @@ def main():
     initial_students = int(available_for_students / price_per_student)
     
     print(f"\nRunning {args.scenario} scenario for {program_display_name} program")
-    print(f"Initial investment: €{args.investment:,.2f}")
-    print(f"Price per student: €{price_per_student:,.2f}")
+    print(f"Initial investment: ${args.investment:,.2f}")
+    print(f"Price per student: ${price_per_student:,.2f}")
     print(f"Initial students that can be funded: {initial_students}")
     
     # Set random seed if provided
@@ -1385,8 +1385,8 @@ def main():
     # Print standard summary
     print("\nPortfolio Performance Summary")
     print("=" * 40)
-    print(f"Initial Investment: €{results['initial_investment']:,.2f}")
-    print(f"Price per Student: €{results['price_per_student']:,.2f}")
+    print(f"Initial Investment: ${results['initial_investment']:,.2f}")
+    print(f"Price per Student: ${results['price_per_student']:,.2f}")
     print(f"Initial Students Funded: {initial_students}")
     print(f"\nISA Parameters:")
     print(f"  - Percentage: {results['isa_percentage']*100:.1f}%")
