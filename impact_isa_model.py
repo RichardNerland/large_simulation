@@ -1390,11 +1390,11 @@ def main():
     print(f"Initial Students Funded: {initial_students}")
     print(f"\nISA Parameters:")
     print(f"  - Percentage: {results['isa_percentage']*100:.1f}%")
-    print(f"  - Cap: €{results['isa_cap']:,.2f}")
+    print(f"  - Cap: ${results['isa_cap']:,.2f}")
     print(f"  - Threshold: €{results['isa_threshold']:,.2f}")
     
     print("\nFinancial Metrics:")
-    print(f"Average Total Payments: €{results['financial_metrics']['avg_total_payments']:,.2f}")
+    print(f"Average Total Payments: ${results['financial_metrics']['avg_total_payments']:,.2f}")
     print(f"Average Total Students Funded: {results['financial_metrics']['avg_students_funded']:.1f}")
     print(f"Average Students per Initial Investment: {results['financial_metrics']['avg_students_funded']/initial_students:.2f}x")
     

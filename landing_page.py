@@ -189,6 +189,7 @@ def create_landing_page():
                 html.H3("Step 3: Run Simulation", style={'color': '#2c3e50', 'marginTop': '25px'}),
                 html.P([
                     "Click 'Run Simulation' to generate results. The initial investment is fixed at $1,000,000, and the number of students funded ",
+                    "Click 'Run Simulation' to generate results. The initial investment is fixed at $1,000,000, and the number of students funded ",
                     "is calculated automatically based on the program-specific cost per student."
                 ], style={'fontSize': '16px', 'lineHeight': '1.6'}),
                 
@@ -260,9 +261,9 @@ def create_landing_page():
                     ]),
                     html.Li([html.Strong("Payment Caps (maximum total repayment): "), 
                         html.Ul([
-                            html.Li("University (Uganda): €72,500"),
-                            html.Li("Nursing (Kenya): €49,950"),
-                            html.Li("Trade (Rwanda): €45,000")
+                            html.Li("University (Uganda): $72,500"),
+                            html.Li("Nursing (Kenya): $49,950"),
+                            html.Li("Trade (Rwanda): $45,000")
                         ], style={'paddingLeft': '30px'})
                     ]),
                     html.Li([html.Strong("Payment Term: "), "Any year with a repayment is counted as a year of repayment, with a 10-year maximum repayment period"]),
@@ -275,7 +276,7 @@ def create_landing_page():
                 ], style={'fontSize': '16px', 'lineHeight': '1.6'}),
                 
                 html.Ul([
-                    html.Li([html.Strong("University (Uganda): "), "$29,050 per student"]),
+                    html.Li([html.Strong("University (Uganda): "), "$29,000 per student"]),
                     html.Li([html.Strong("Nursing (Kenya): "), "$16,650 per student"]),
                     html.Li([html.Strong("Trade (Rwanda): "), "$16,650 per student"])
                 ], style={'fontSize': '16px', 'lineHeight': '1.6', 'paddingLeft': '30px'}),
