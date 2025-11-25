@@ -38,7 +38,7 @@ impact_params = ImpactParams(
     discount_rate=0.04,
     counterfactual=counterfactual_params,
     ppp_multiplier=0.4,
-    health_benefit_per_euro=0.0001,
+    health_benefit_per_euro=0.00003,
     migration_influence_factor=0.05,
     moral_weight=1.44
 )

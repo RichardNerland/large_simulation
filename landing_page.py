@@ -292,7 +292,7 @@ def create_landing_page():
                     html.Li([html.Strong("Assistant Track: "), "€31,500/year starting salary, 0.5% annual growth, 3 years to complete"]),
                     html.Li([html.Strong("Nursing Degree: "), "€40,000/year starting salary, 2% annual growth, 4 years to complete"]),
                     html.Li([html.Strong("Trade Program: "), "€35,000/year starting salary, 2% annual growth, 3 years to complete"]),
-                    html.Li([html.Strong("Failed/Home Return Track: "), "€2,200/year earnings, 1% annual growth, 2 years to 'complete'"]),
+                    html.Li([html.Strong("Failed/Home Return Track: "), "€1,100/year earnings, 1% annual growth, 2 years to 'complete'"]),
                     html.Li([html.Strong("Salary Cap: "), "All tracks cap earnings at 1.5x starting salary to model realistic career progression"])
                 ], style={'fontSize': '16px', 'lineHeight': '1.6', 'paddingLeft': '30px'}),
                 
@@ -328,7 +328,7 @@ def create_landing_page():
                     html.Li([html.Strong("Discount Rate: "), "4% annually for present value calculations"]),
                     html.Li([html.Strong("Investment Buffer: "), "2% of initial investment reserved as cash buffer"]),
                     html.Li([html.Strong("PPP Multiplier: "), "0.4 purchasing power parity adjustment for German to home country earnings"]),
-                    html.Li([html.Strong("Counterfactual Baseline: "), "€2,400/year base earnings without migration, 1% annual growth, with HH size 4"]),
+                    html.Li([html.Strong("Counterfactual Baseline: "), "$511/year base consumption without migration, 1% annual growth, with HH size 5"]),
                     html.Li([html.Strong("Remittance Rate: "), "8% of income sent as remittances to home country"]),
                     html.Li([html.Strong("Health Benefits: "), "0.00003 health utility per euro of additional income (based on GiveWell methodology)"]),
                     html.Li([html.Strong("Migration Influence: "), "5% factor for spillover effects from observing migration success"]),
