@@ -292,7 +292,7 @@ def create_landing_page():
                     html.Li([html.Strong("Assistant Track: "), "€31,500/year starting salary, 0.5% annual growth, 3 years to complete"]),
                     html.Li([html.Strong("Nursing Degree: "), "€40,000/year starting salary, 2% annual growth, 4 years to complete"]),
                     html.Li([html.Strong("Trade Program: "), "€35,000/year starting salary, 2% annual growth, 3 years to complete"]),
-                    html.Li([html.Strong("Failed/Home Return Track: "), "€1,100/year earnings, 1% annual growth, 2 years to 'complete'"]),
+                    html.Li([html.Strong("Failed/Home Return Track: "), "$1,100/year consumption, 1% annual growth, 2 years to 'complete'"]),
                     html.Li([html.Strong("Salary Cap: "), "All tracks cap earnings at 1.5x starting salary to model realistic career progression"])
                 ], style={'fontSize': '16px', 'lineHeight': '1.6', 'paddingLeft': '30px'}),
                 
