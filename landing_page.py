@@ -40,9 +40,9 @@ def create_landing_page():
                 ], style={'fontSize': '16px', 'lineHeight': '1.6'}),
                 
                 html.Ul([
-                    html.Li([html.Strong("Uganda: "), "University program focusing on bachelor's and master's degrees"]),
-                    html.Li([html.Strong("Kenya: "), "Nursing program focusing on nursing degrees and assistant positions"]),
-                    html.Li([html.Strong("Rwanda: "), "Trade program focusing on vocational training and assistant positions"])
+                    html.Li([html.Strong("University (Uganda): "), "University program focusing on bachelor's and master's degrees"]),
+                    html.Li([html.Strong("Nursing (Kenya): "), "Nursing program focusing on nursing degrees and assistant positions"]),
+                    html.Li([html.Strong("Trade (Rwanda): "), "Trade program focusing on vocational training and assistant positions"])
                 ], style={'fontSize': '16px', 'lineHeight': '1.6', 'paddingLeft': '30px'}),
                 
                 html.H3("Step 2: Choose Simulation Mode", style={'color': '#2c3e50', 'marginTop': '25px'}),
@@ -183,9 +183,7 @@ def create_landing_page():
                 html.P([
                     html.Strong("Note: "), 
                     "\"Assistant Shift\" refers to students who initially pursue higher degrees but shift to assistant-level positions, taking longer to complete their education. ",
-                    "\"Not Applicable (NA)\" represents students who do not successfully complete their programs. ",
-                    "For Kenya/Rwanda programs, NA students fail German language acquisition and never travel to Germany. ",
-                    "For Uganda, NA students drop out during studies and return to their home countries."
+                    "\"Not Applicable (NA)\" represents students who do not successfully complete their programs (see NA Track Interpretation below for details by program type)."
                 ], style={'fontSize': '14px', 'lineHeight': '1.6', 'fontStyle': 'italic', 'marginTop': '15px'}),
                 
                 html.H3("Step 3: Run Simulation", style={'color': '#2c3e50', 'marginTop': '25px'}),
@@ -260,9 +258,9 @@ def create_landing_page():
                     ]),
                     html.Li([html.Strong("Payment Caps (maximum total repayment): "), 
                         html.Ul([
-                            html.Li("University (Uganda): $72,500"),
-                            html.Li("Nursing (Kenya): $49,950"),
-                            html.Li("Trade (Rwanda): $45,000")
+                            html.Li("University (Uganda): €72,500"),
+                            html.Li("Nursing (Kenya): €49,950"),
+                            html.Li("Trade (Rwanda): €45,000")
                         ], style={'paddingLeft': '30px'})
                     ]),
                     html.Li([html.Strong("Payment Term: "), "Any year with a repayment is counted as a year of repayment, with a 10-year maximum repayment period"]),
@@ -302,11 +300,11 @@ def create_landing_page():
                 ], style={'fontSize': '16px', 'lineHeight': '1.6'}),
                 
                 html.Ul([
-                    html.Li([html.Strong("Year 1 - German Learning: "), "Students spend 1 year in their home country learning German. During this time, they earn counterfactual income (~€511/year)."]),
+                    html.Li([html.Strong("Year 1 - German Learning: "), "Students spend 1 year in their home country learning German. During this time, they earn counterfactual income."]),
                     html.Li([html.Strong("German Acquisition: "), "At the end of the German learning year, students who successfully acquire the language travel to Germany. Students in the NA (Not Applicable) track are considered to have failed German acquisition and remain in their home country."]),
-                    html.Li([html.Strong("Study Phase in Germany: "), "Students who pass German earn €12,650/year during their studies in Germany (representing part-time work and living stipends)."]),
+                    html.Li([html.Strong("Study Phase in Germany: "), "Students who pass German earn €12,650/year during their studies in Germany (representing apprenticeship wages)."]),
                     html.Li([html.Strong("Post-Graduation: "), "After graduation, students earn according to their degree type. Those who failed German acquisition continue earning counterfactual income in their home country."]),
-                    html.Li([html.Strong("NA Track Interpretation: "), "For Kenya/Rwanda programs, the NA percentage in each scenario represents students who fail to acquire German and never travel to Germany."])
+                    html.Li([html.Strong("NA Track Interpretation: "), "For Kenya/Rwanda programs, NA students fail German language acquisition and never travel to Germany. For Uganda, NA students drop out during studies and return to their home countries."])
                 ], style={'fontSize': '16px', 'lineHeight': '1.6', 'paddingLeft': '30px'}),
                 
                 html.P([
@@ -347,20 +345,20 @@ def create_landing_page():
                     html.Li([html.Strong("Investment Buffer: "), "2% of initial investment reserved as cash buffer"]),
                     html.Li([html.Strong("Currency Handling: "), 
                         html.Ul([
-                            html.Li("German earnings (salaries, study income, stipends): EUR"),
-                            html.Li("Counterfactual earnings (home country): USD"),
-                            html.Li("EUR/USD Exchange Rate: 0.8458 EUR per USD (GiveWell analysis)"),
-                            html.Li("EUR earnings are converted to USD (EUR ÷ 0.8458) before comparing with counterfactual"),
-                            html.Li("Remittances: Calculated as 8% of EUR earnings, then converted to USD for utility calculations"),
-                            html.Li("ISA payments: Collected in EUR (thresholds and caps are EUR-denominated)")
+                            html.Li("German earnings (salaries, study income, stipends): €"),
+                            html.Li("Counterfactual earnings (home country): $"),
+                            html.Li("€/$ Exchange Rate: €0.8458 per $1 (GiveWell analysis)"),
+                            html.Li("€ earnings are converted to $ (€ ÷ 0.8458) before comparing with counterfactual"),
+                            html.Li("Remittances: Calculated as 8% of € earnings, then converted to $ for utility calculations"),
+                            html.Li("ISA payments: Collected in € (thresholds and caps are €-denominated)")
                         ], style={'paddingLeft': '30px'})
                     ]),
-                    html.Li([html.Strong("PPP Multiplier: "), "0.4 purchasing power parity adjustment applied to USD earnings gain for home country purchasing power"]),
+                    html.Li([html.Strong("PPP Multiplier: "), "0.4 purchasing power parity adjustment applied to $ earnings gain for home country purchasing power"]),
                     html.Li([html.Strong("Counterfactual Household Model: "), 
                         html.Ul([
                             html.Li("Household size: 5 members (including control person)"),
                             html.Li("Number of earners: 2"),
-                            html.Li("Base earnings per earner: $1,503/year (USD)"),
+                            html.Li("Base earnings per earner: $1,503/year"),
                             html.Li("Per-person consumption: $601.20/year (= 2 × $1,503 ÷ 5)"),
                             html.Li("Control earner multiplier: 1.0 (configurable to allow control to earn more than other earner)")
                         ], style={'paddingLeft': '30px'})
@@ -369,12 +367,12 @@ def create_landing_page():
                         html.Ul([
                             html.Li("Household size: 4 members (treated person is in Germany)"),
                             html.Li("Number of earners: 2"),
-                            html.Li("Base earnings per earner: $1,503/year (USD)"),
+                            html.Li("Base earnings per earner: $1,503/year"),
                             html.Li("Per-person base consumption: $751.50/year (= 2 × $1,503 ÷ 4)"),
-                            html.Li("Remittances received are in USD (converted from EUR at 0.8458 rate)")
+                            html.Li("Remittances received are in $ (converted from € at 0.8458 rate)")
                         ], style={'paddingLeft': '30px'})
                     ]),
-                    html.Li([html.Strong("Remittance Rate: "), "8% of EUR income sent as remittances, converted to USD for home country"]),
+                    html.Li([html.Strong("Remittance Rate: "), "8% of € income sent as remittances, converted to $ for home country"]),
                     html.Li([html.Strong("Health Benefits: "), "0.00003 health utility per euro of additional income (based on GiveWell methodology)"]),
                     html.Li([html.Strong("Migration Influence: "), "5% factor for spillover effects from observing migration success"]),
                     html.Li([html.Strong("Moral Weight: "), "Value of 1 is the value of doubling consumption for one person for one year, alpha parameter for direct income effects (GiveWell framework)"]),
@@ -402,74 +400,27 @@ def create_landing_page():
                     "This section explains these modeling choices and their rationale."
                 ], style={'fontSize': '16px', 'lineHeight': '1.6'}),
                 
-                html.H3("Unemployment Rate Parameter", style={'color': '#2c3e50', 'marginTop': '25px'}),
+                html.H3("Labor Force Interruptions & Modeling Approach", style={'color': '#2c3e50', 'marginTop': '25px'}),
                 html.P([
-                    "The 'unemployment rate' parameter consolidates several real-world scenarios that result in temporary work interruptions:"
+                    "The model consolidates various real-world scenarios that affect earnings and ISA payments into two key parameters:"
                 ], style={'fontSize': '16px', 'lineHeight': '1.6'}),
                 
                 html.Ul([
-                    html.Li([html.Strong("Traditional Unemployment: "), "Periods when graduates are actively seeking but unable to find employment"]),
-                    html.Li([html.Strong("Part-time Work Transitions: "), "Temporary reductions in work hours or transitions between jobs"]),
-                    html.Li([html.Strong("'Baby Exits': "), "Career interruptions for childbirth and early childcare responsibilities"]),
-                    html.Li([html.Strong("Model Impact: "), "Results in a one-year drop out of ISA repayments and a 3-year experience penalty on the earnings curve"])
+                    html.Li([html.Strong("Unemployment Rate: "), "Captures temporary interruptions (job transitions, parental leave, short-term unemployment). Results in a one-year ISA payment gap and a 3-year experience penalty."]),
+                    html.Li([html.Strong("Leave Labor Force / NA Probability: "), "Captures permanent or long-term exits (extended part-time work, family responsibilities, repayment morale issues, career pivots to lower-paying fields)."])
                 ], style={'fontSize': '16px', 'lineHeight': '1.6', 'paddingLeft': '30px'}),
                 
-                html.H3("Leave Labor Force Probability", style={'color': '#2c3e50', 'marginTop': '25px'}),
                 html.P([
-                    "This parameter captures longer-term departures from the workforce:"
-                ], style={'fontSize': '16px', 'lineHeight': '1.6'}),
+                    "These scenarios are consolidated because they have mathematically equivalent effects on ISA outcomes—whether someone reduces payments due to part-time work, ",
+                    "family care, or unwillingness to pay, the impact on repayment cash flows is similar."
+                ], style={'fontSize': '16px', 'lineHeight': '1.6', 'marginTop': '15px'}),
                 
-                html.Ul([
-                    html.Li([html.Strong("Extended Part-time Work: "), "Sustained reductions in work hours that significantly impact earning capacity"]),
-                    html.Li([html.Strong("Repayment Morale Issues: "), "Situations where graduates choose to reduce or cease ISA payments due to dissatisfaction or changing circumstances"]),
-                    html.Li([html.Strong("Family Responsibilities: "), "Extended periods dedicated to family care or other personal obligations"]),
-                    html.Li([html.Strong("Career Changes: "), "Major career pivots that may involve permanent income reductions"])
-                ], style={'fontSize': '16px', 'lineHeight': '1.6', 'paddingLeft': '30px'}),
-                
-                html.H3("Consumption vs. Earnings Focus", style={'color': '#2c3e50', 'marginTop': '25px'}),
                 html.P([
-                    "The model primarily focuses on earnings-based impact rather than consumption-based impact for several reasons:"
-                ], style={'fontSize': '16px', 'lineHeight': '1.6'}),
-                
-                html.Ul([
-                    html.Li([html.Strong("Data Availability: "), "Earnings data is more readily available and comparable across different contexts than detailed consumption patterns"]),
-                    html.Li([html.Strong("Partnership Complexity: "), "Consumption-based modeling would require incorporating partnership formation, household dynamics, and family structures, adding significant complexity"]),
-                    html.Li([html.Strong("Marriage and Children: "), "A consumption focus would necessitate modeling the timing of marriage, number of children, and household formation patterns, which vary significantly across cultures and individuals"]),
-                    html.Li([html.Strong("Conservative Approach: "), "The earnings focus provides a more conservative estimate of impact, as consumption benefits through partnerships and family formation would likely increase total welfare gains"])
-                ], style={'fontSize': '16px', 'lineHeight': '1.6', 'paddingLeft': '30px'}),
-                
-                html.H3("Conservative Scope of Impact", style={'color': '#2c3e50', 'marginTop': '25px'}),
-                html.P([
-                    "To maintain conservative estimates, the model excludes certain potential benefits:"
-                ], style={'fontSize': '16px', 'lineHeight': '1.6'}),
-                
-                html.Ul([
-                    html.Li([html.Strong("Future Children: "), "The model does not account for utility accruing to children who will be born to program participants, even though these children may benefit from improved family circumstances"]),
-                    html.Li([html.Strong("Intergenerational Benefits: "), "Long-term benefits to participants' descendants are not included in the impact calculations"])
-                ], style={'fontSize': '16px', 'lineHeight': '1.6', 'paddingLeft': '30px'}),
-                
-                html.H3("Mathematical Equivalence of Exit Types", style={'color': '#2c3e50', 'marginTop': '25px'}),
-                html.P([
-                    "From a mathematical modeling perspective, different reasons for leaving the workforce or reducing payments have similar effects on ISA repayment outcomes and make welfare calculations more conservative:"
-                ], style={'fontSize': '16px', 'lineHeight': '1.6'}),
-                
-                html.Ul([
-                    html.Li([html.Strong("Part-time Work: "), "Reduces both earnings and ISA payment capacity"]),
-                    html.Li([html.Strong("Stay-at-home Periods: "), "Eliminates earnings and ISA payments during the period, this is a conservative assumption as it does not account for the high consumption that would allow labor force dropout"]),
-                    html.Li([html.Strong("Non-payment Due to Morale: "), "Reduces ISA returns regardless of continued earning capacity"]),
-                    html.Li([html.Strong("Modeling Choice: "), "Rather than creating separate parameters that would be mathematically identical in their effects, these scenarios are consolidated into 'leave labor force' probability"])
-                ], style={'fontSize': '16px', 'lineHeight': '1.6', 'paddingLeft': '30px'}),
-                
-                html.H3("Network Effects and Repayment Collapse", style={'color': '#2c3e50', 'marginTop': '25px'}),
-                html.P([
-                    "Advanced modeling approaches could incorporate network effects in repayment behavior:"
-                ], style={'fontSize': '16px', 'lineHeight': '1.6'}),
-                
-                html.Ul([
-                    html.Li([html.Strong("Network Model Possibility: "), "A sophisticated approach could model repayment collapse as connected nodes in a network, where students' repayment decisions influence each other"]),
-                    html.Li([html.Strong("Contagion Effects: "), "In such a model, students connected to non-paying participants would have increased probability of also ceasing payments"]),
-                    html.Li([html.Strong("Current Simplification: "), "Without implementing this network complexity, the model treats repayment decisions as independent events based on individual circumstances"])
-                ], style={'fontSize': '16px', 'lineHeight': '1.6', 'paddingLeft': '30px'}),
+                    html.Strong("Why earnings-based (not consumption-based): "), 
+                    "The model uses earnings rather than consumption because earnings data is more reliable, and consumption modeling would require complex assumptions about ",
+                    "marriage timing, household formation, and family size. This yields conservative estimates, as consumption benefits through partnerships would likely increase welfare gains. ",
+                    "Benefits to future children and intergenerational effects are also excluded for conservatism."
+                ], style={'fontSize': '16px', 'lineHeight': '1.6', 'marginTop': '15px'}),
                 
                 html.H2("Additional Resources", style={'color': '#2c3e50', 'borderBottom': '1px solid #eee', 'paddingBottom': '10px', 'marginTop': '30px'}),
                 
