@@ -73,7 +73,7 @@ class ImpactParams:
     health_benefit_per_euro: float = 0.00003  # Health utility gained per euro of additional income (based on GiveWell's approach)
     migration_influence_factor: float = 0.05  # Additional people who migrate due to observing success
     moral_weight: float = 1.44  # Moral weight (alpha) for direct income effects, based on GiveWell's approach
-    eur_to_usd: float = 0.8458  # Exchange rate: USD per EUR (GiveWell analysis). EUR earnings × this = USD equivalent
+    eur_to_usd: float = 0.8458  # Exchange rate: EUR per USD (GiveWell analysis). EUR earnings ÷ this = USD equivalent
 
 def calculate_utility(income: float) -> float:
     """Calculate log utility for a given income level."""
@@ -345,7 +345,8 @@ class Student:
         - ppp_multiplier: PPP adjustment for USD to home country purchasing power
         """
         # Convert EUR earnings to USD for comparison with counterfactual
-        earnings_usd = self.earnings * eur_to_usd
+        # eur_to_usd is EUR per USD (0.8458), so divide EUR by rate to get USD
+        earnings_usd = self.earnings / eur_to_usd
         
         # Calculate total earnings and counterfactual earnings in real USD terms
         total_earnings_usd = np.sum(earnings_usd / year.deflator)
@@ -357,7 +358,7 @@ class Student:
         # Remittances are sent from EUR earnings, converted to USD for receiving household
         remittance_rate = 0.08
         remittances_eur = self.earnings * remittance_rate / year.deflator
-        remittances_usd = remittances_eur * eur_to_usd  # Convert to USD
+        remittances_usd = remittances_eur / eur_to_usd  # Convert EUR to USD (divide by EUR per USD rate)
         counterfactual_remittances = self.counterfactual_earnings * remittance_rate / year.deflator  # Already USD
         remittance_gain = np.sum(remittances_usd) - np.sum(counterfactual_remittances)
         
@@ -687,7 +688,7 @@ def calculate_student_statistics(student: Student, num_years: int, remittance_ra
     - student.earnings: EUR (German salaries) - converted to USD for comparison/utility
     - student.counterfactual_earnings: USD (home country)
     - Remittances are calculated on EUR earnings, then converted to USD for utility calculations
-    - The eur_to_usd rate converts EUR to USD: EUR_amount * eur_to_usd = USD_amount
+    - The eur_to_usd rate is EUR per USD (0.8458), so: EUR_amount / eur_to_usd = USD_amount
     """
     # FX conversion rate (EUR to USD)
     eur_to_usd = impact_params.eur_to_usd
@@ -695,7 +696,8 @@ def calculate_student_statistics(student: Student, num_years: int, remittance_ra
     # Convert EUR earnings to USD for comparison with counterfactual
     # student.earnings are in EUR (German salaries)
     # student.counterfactual_earnings are in USD (home country earnings)
-    earnings_usd = student.earnings * eur_to_usd
+    # eur_to_usd is EUR per USD (0.8458), so divide EUR by rate to get USD
+    earnings_usd = student.earnings / eur_to_usd
     
     # Calculate lifetime earnings in USD (undiscounted sum)
     lifetime_earnings_usd = np.sum(earnings_usd)
@@ -719,7 +721,7 @@ def calculate_student_statistics(student: Student, num_years: int, remittance_ra
     # Remittances are sent from EUR earnings, converted to USD for receiving household
     # remittance_rate is applied to EUR earnings, then converted to USD
     lifetime_remittances_eur = lifetime_earnings_eur * remittance_rate
-    lifetime_remittances_usd = lifetime_remittances_eur * eur_to_usd
+    lifetime_remittances_usd = lifetime_remittances_eur / eur_to_usd
     counterfactual_remittances = counterfactual_lifetime_earnings * impact_params.counterfactual.remittance_rate
     
     # Calculate yearly utilities with proper discounting to absolute simulation year 0
@@ -734,8 +736,8 @@ def calculate_student_statistics(student: Student, num_years: int, remittance_ra
         absolute_simulation_year = student.start_year + idx_relative_to_student_earnings
         discount_factor = (1 / (1 + impact_params.discount_rate)) ** absolute_simulation_year
         
-        # Convert this year's EUR earnings to USD
-        year_earnings_usd = student.earnings[idx_relative_to_student_earnings] * eur_to_usd
+        # Convert this year's EUR earnings to USD (divide by EUR per USD rate)
+        year_earnings_usd = student.earnings[idx_relative_to_student_earnings] / eur_to_usd
         
         # Calculate per-year undiscounted utilities (all in USD)
         year_utils = calculate_total_utility(
@@ -923,10 +925,9 @@ def simulate_impact(
     
     # Set default stipend for University (Uganda) program - represents side job + first year stipend
     # Uganda students are already in Germany, so no German learning phase
-    # GiveWell: $1032/month nominal = $1320/month real (PPP-adjusted) = $15,840/year real
     if program_type == 'University':
         if stipend_income is None:
-            stipend_income = 15840  # GiveWell: $1320/month real (PPP-adjusted) × 12 months
+            stipend_income = 12384  # Annual stipend for Uganda program
         if stipend_std is None:
             stipend_std = 1500  # Proportionally scaled std dev
         german_learning_years = 0
@@ -939,7 +940,7 @@ def simulate_impact(
         if stipend_std is None:
             stipend_std = 0
         german_learning_years = 1
-        study_income = 14000  # €14k/year during studies in Germany
+        study_income = 12650  # Annual study income during studies in Germany for Rwanda/Kenya
     
     # Initialize economic conditions
     year = Year(
@@ -1085,10 +1086,10 @@ def simulate_impact(
                 }
             
             earnings_eur = student.earnings[relative_year]
-            earnings_usd = earnings_eur * eur_to_usd
+            earnings_usd = earnings_eur / eur_to_usd
             counterfactual_usd = student.counterfactual_earnings[relative_year]
             remittances_eur = earnings_eur * remittance_rate
-            remittances_usd = remittances_eur * eur_to_usd
+            remittances_usd = remittances_eur / eur_to_usd
             
             degree_earnings[degree_name]['count'] += 1
             degree_earnings[degree_name]['total_earnings_eur'] += earnings_eur
@@ -1404,7 +1405,7 @@ def get_degree_for_scenario(scenario: str, program_type: str, home_prob: float, 
                 annual_growth=0.03,
                 years_to_complete=4,
                 home_prob=home_prob
-            ), 0.7),  # 70% BA
+            ), 0.686),  # 68.6% BA
             (DegreeParams(
                 name='MA',
                 initial_salary=46709,
@@ -1412,7 +1413,7 @@ def get_degree_for_scenario(scenario: str, program_type: str, home_prob: float, 
                 annual_growth=0.04,
                 years_to_complete=6,
                 home_prob=home_prob
-            ), 0.2),   # 20% MA
+            ), 0.196),   # 19.6% MA
             (DegreeParams(
                 name='ASST_SHIFT',
                 initial_salary=31500,
@@ -1420,12 +1421,20 @@ def get_degree_for_scenario(scenario: str, program_type: str, home_prob: float, 
                 annual_growth=0.005,
                 years_to_complete=6,  # Longer time to complete (6 years)
                 home_prob=home_prob
-            ), 0.1)    # 10% ASST_SHIFT (students who begin pursuing bachelors but shift to assistant)
+            ), 0.098),    # 9.8% ASST_SHIFT (students who begin pursuing bachelors but shift to assistant)
+            (DegreeParams(
+                name='NA',
+                initial_salary=4000,
+                salary_std=640,
+                annual_growth=0.01,
+                years_to_complete=2,
+                home_prob=1.0  # Fixed high home probability for NA
+            ), 0.02)   # 2% NA
         ]
     elif program_type == 'Nurse':  # Kenya program
         # For Nurse programs
         # 33% of ASST should be moved to asst_shift
-        asst_percentage = 0.60
+        asst_percentage = 0.586
         asst_shift_percentage = asst_percentage * 0.33
         regular_asst_percentage = asst_percentage - asst_shift_percentage
         
@@ -1437,7 +1446,7 @@ def get_degree_for_scenario(scenario: str, program_type: str, home_prob: float, 
                 annual_growth=0.02,
                 years_to_complete=4,
                 home_prob=home_prob
-            ), 0.25),  # 25% NURSE
+            ), 0.244),  # 24.4% NURSE
             (DegreeParams(
                 name='ASST',
                 initial_salary=31500,
@@ -1445,7 +1454,7 @@ def get_degree_for_scenario(scenario: str, program_type: str, home_prob: float, 
                 annual_growth=0.005,
                 years_to_complete=3,
                 home_prob=home_prob
-            ), regular_asst_percentage),  # ~40% ASST
+            ), regular_asst_percentage),  # ~39.3% ASST
             (DegreeParams(
                 name='ASST_SHIFT',
                 initial_salary=31500,  # Same salary as ASST
@@ -1453,7 +1462,7 @@ def get_degree_for_scenario(scenario: str, program_type: str, home_prob: float, 
                 annual_growth=0.005,
                 years_to_complete=6,  # Longer time to complete (6 years)
                 home_prob=home_prob
-            ), asst_shift_percentage),  # ~20% ASST_SHIFT
+            ), asst_shift_percentage),  # ~19.3% ASST_SHIFT
             (DegreeParams(
                 name='NA',
                 initial_salary=1100,
@@ -1461,12 +1470,12 @@ def get_degree_for_scenario(scenario: str, program_type: str, home_prob: float, 
                 annual_growth=0.01,
                 years_to_complete=2,
                 home_prob=1.0  # Fixed high home probability for NA
-            ), 0.15)   # 15% NA
+            ), 0.17)   # 17% NA
         ]
     elif program_type == 'Trade':  # Rwanda program
         # For Trade programs
         # 33% of ASST should be moved to asst_shift
-        asst_percentage = 0.40
+        asst_percentage = 0.39
         asst_shift_percentage = asst_percentage * 0.33
         regular_asst_percentage = asst_percentage - asst_shift_percentage
         
@@ -1478,7 +1487,7 @@ def get_degree_for_scenario(scenario: str, program_type: str, home_prob: float, 
                 annual_growth=0.02,
                 years_to_complete=3,
                 home_prob=home_prob
-            ), 0.40),  # 40% TRADE
+            ), 0.39),  # 39% TRADE
             (DegreeParams(
                 name='ASST',
                 initial_salary=31500,
@@ -1486,7 +1495,7 @@ def get_degree_for_scenario(scenario: str, program_type: str, home_prob: float, 
                 annual_growth=0.005,
                 years_to_complete=3,
                 home_prob=home_prob
-            ), regular_asst_percentage),  # ~27% ASST
+            ), regular_asst_percentage),  # ~26.1% ASST
             (DegreeParams(
                 name='ASST_SHIFT',
                 initial_salary=31500,  # Same salary as ASST
@@ -1494,7 +1503,7 @@ def get_degree_for_scenario(scenario: str, program_type: str, home_prob: float, 
                 annual_growth=0.005,
                 years_to_complete=6,  # Longer time to complete (6 years)
                 home_prob=home_prob
-            ), asst_shift_percentage),  # ~13% ASST_SHIFT
+            ), asst_shift_percentage),  # ~12.9% ASST_SHIFT
             (DegreeParams(
                 name='NA',
                 initial_salary=1100,
@@ -1502,7 +1511,7 @@ def get_degree_for_scenario(scenario: str, program_type: str, home_prob: float, 
                 annual_growth=0.01,
                 years_to_complete=2,
                 home_prob=1.0  # Fixed high home probability for NA
-            ), 0.20)   # 20% NA
+            ), 0.22)   # 22% NA
         ]
     else:
         raise ValueError("Program type must be 'University' (Uganda), 'Nurse' (Kenya), or 'Trade' (Rwanda)")
