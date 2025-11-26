@@ -71,30 +71,30 @@ def create_landing_page():
                     ]),
                     html.Tbody([
                         html.Tr([html.Td("P10", style={'border': '1px solid #ddd', 'padding': '8px'}), 
-                                html.Td("20%", style={'border': '1px solid #ddd', 'padding': '8px'}), 
-                                html.Td("10%", style={'border': '1px solid #ddd', 'padding': '8px'}), 
-                                html.Td("35%", style={'border': '1px solid #ddd', 'padding': '8px'}), 
-                                html.Td("35%", style={'border': '1px solid #ddd', 'padding': '8px'})]),
-                        html.Tr([html.Td("P25", style={'border': '1px solid #ddd', 'padding': '8px'}), 
-                                html.Td("35%", style={'border': '1px solid #ddd', 'padding': '8px'}), 
-                                html.Td("15%", style={'border': '1px solid #ddd', 'padding': '8px'}), 
-                                html.Td("35%", style={'border': '1px solid #ddd', 'padding': '8px'}), 
-                                html.Td("15%", style={'border': '1px solid #ddd', 'padding': '8px'})]),
-                        html.Tr([html.Td("P50", style={'border': '1px solid #ddd', 'padding': '8px'}), 
-                                html.Td("45%", style={'border': '1px solid #ddd', 'padding': '8px'}), 
-                                html.Td("24%", style={'border': '1px solid #ddd', 'padding': '8px'}), 
-                                html.Td("27%", style={'border': '1px solid #ddd', 'padding': '8px'}), 
-                                html.Td("4%", style={'border': '1px solid #ddd', 'padding': '8px'})]),
-                        html.Tr([html.Td("P75", style={'border': '1px solid #ddd', 'padding': '8px'}), 
-                                html.Td("50%", style={'border': '1px solid #ddd', 'padding': '8px'}), 
-                                html.Td("30%", style={'border': '1px solid #ddd', 'padding': '8px'}), 
                                 html.Td("18%", style={'border': '1px solid #ddd', 'padding': '8px'}), 
-                                html.Td("2%", style={'border': '1px solid #ddd', 'padding': '8px'})]),
+                                html.Td("9%", style={'border': '1px solid #ddd', 'padding': '8px'}), 
+                                html.Td("31.5%", style={'border': '1px solid #ddd', 'padding': '8px'}), 
+                                html.Td("41.5%", style={'border': '1px solid #ddd', 'padding': '8px'})]),
+                        html.Tr([html.Td("P25", style={'border': '1px solid #ddd', 'padding': '8px'}), 
+                                html.Td("31.5%", style={'border': '1px solid #ddd', 'padding': '8px'}), 
+                                html.Td("13.5%", style={'border': '1px solid #ddd', 'padding': '8px'}), 
+                                html.Td("31.5%", style={'border': '1px solid #ddd', 'padding': '8px'}), 
+                                html.Td("23.5%", style={'border': '1px solid #ddd', 'padding': '8px'})]),
+                        html.Tr([html.Td("P50", style={'border': '1px solid #ddd', 'padding': '8px'}), 
+                                html.Td("40.5%", style={'border': '1px solid #ddd', 'padding': '8px'}), 
+                                html.Td("21.6%", style={'border': '1px solid #ddd', 'padding': '8px'}), 
+                                html.Td("24.3%", style={'border': '1px solid #ddd', 'padding': '8px'}), 
+                                html.Td("13.6%", style={'border': '1px solid #ddd', 'padding': '8px'})]),
+                        html.Tr([html.Td("P75", style={'border': '1px solid #ddd', 'padding': '8px'}), 
+                                html.Td("45%", style={'border': '1px solid #ddd', 'padding': '8px'}), 
+                                html.Td("27%", style={'border': '1px solid #ddd', 'padding': '8px'}), 
+                                html.Td("16.2%", style={'border': '1px solid #ddd', 'padding': '8px'}), 
+                                html.Td("11.8%", style={'border': '1px solid #ddd', 'padding': '8px'})]),
                         html.Tr([html.Td("P90", style={'border': '1px solid #ddd', 'padding': '8px'}), 
-                                html.Td("60%", style={'border': '1px solid #ddd', 'padding': '8px'}), 
-                                html.Td("39%", style={'border': '1px solid #ddd', 'padding': '8px'}), 
-                                html.Td("1%", style={'border': '1px solid #ddd', 'padding': '8px'}), 
-                                html.Td("0%", style={'border': '1px solid #ddd', 'padding': '8px'})])
+                                html.Td("54%", style={'border': '1px solid #ddd', 'padding': '8px'}), 
+                                html.Td("35.1%", style={'border': '1px solid #ddd', 'padding': '8px'}), 
+                                html.Td("0.9%", style={'border': '1px solid #ddd', 'padding': '8px'}), 
+                                html.Td("10%", style={'border': '1px solid #ddd', 'padding': '8px'})])
                     ])
                 ], style={'width': '100%', 'borderCollapse': 'collapse', 'marginBottom': '20px'}),
                 
@@ -112,30 +112,30 @@ def create_landing_page():
                     ]),
                     html.Tbody([
                         html.Tr([html.Td("P10", style={'border': '1px solid #ddd', 'padding': '8px'}), 
-                                html.Td("12%", style={'border': '1px solid #ddd', 'padding': '8px'}), 
-                                html.Td("13%", style={'border': '1px solid #ddd', 'padding': '8px'}), 
-                                html.Td("20%", style={'border': '1px solid #ddd', 'padding': '8px'}), 
-                                html.Td("55%", style={'border': '1px solid #ddd', 'padding': '8px'})]),
+                                html.Td("10.8%", style={'border': '1px solid #ddd', 'padding': '8px'}), 
+                                html.Td("11.7%", style={'border': '1px solid #ddd', 'padding': '8px'}), 
+                                html.Td("18%", style={'border': '1px solid #ddd', 'padding': '8px'}), 
+                                html.Td("59.5%", style={'border': '1px solid #ddd', 'padding': '8px'})]),
                         html.Tr([html.Td("P25", style={'border': '1px solid #ddd', 'padding': '8px'}), 
-                                html.Td("20%", style={'border': '1px solid #ddd', 'padding': '8px'}), 
-                                html.Td("35%", style={'border': '1px solid #ddd', 'padding': '8px'}), 
-                                html.Td("25%", style={'border': '1px solid #ddd', 'padding': '8px'}), 
-                                html.Td("20%", style={'border': '1px solid #ddd', 'padding': '8px'})]),
+                                html.Td("18%", style={'border': '1px solid #ddd', 'padding': '8px'}), 
+                                html.Td("31.5%", style={'border': '1px solid #ddd', 'padding': '8px'}), 
+                                html.Td("22.5%", style={'border': '1px solid #ddd', 'padding': '8px'}), 
+                                html.Td("28%", style={'border': '1px solid #ddd', 'padding': '8px'})]),
                         html.Tr([html.Td("P50", style={'border': '1px solid #ddd', 'padding': '8px'}), 
-                                html.Td("30%", style={'border': '1px solid #ddd', 'padding': '8px'}), 
-                                html.Td("40%", style={'border': '1px solid #ddd', 'padding': '8px'}), 
-                                html.Td("20%", style={'border': '1px solid #ddd', 'padding': '8px'}), 
-                                html.Td("10%", style={'border': '1px solid #ddd', 'padding': '8px'})]),
+                                html.Td("27%", style={'border': '1px solid #ddd', 'padding': '8px'}), 
+                                html.Td("36%", style={'border': '1px solid #ddd', 'padding': '8px'}), 
+                                html.Td("18%", style={'border': '1px solid #ddd', 'padding': '8px'}), 
+                                html.Td("19%", style={'border': '1px solid #ddd', 'padding': '8px'})]),
                         html.Tr([html.Td("P75", style={'border': '1px solid #ddd', 'padding': '8px'}), 
-                                html.Td("45%", style={'border': '1px solid #ddd', 'padding': '8px'}), 
-                                html.Td("40%", style={'border': '1px solid #ddd', 'padding': '8px'}), 
-                                html.Td("10%", style={'border': '1px solid #ddd', 'padding': '8px'}), 
-                                html.Td("5%", style={'border': '1px solid #ddd', 'padding': '8px'})]),
+                                html.Td("40.5%", style={'border': '1px solid #ddd', 'padding': '8px'}), 
+                                html.Td("36%", style={'border': '1px solid #ddd', 'padding': '8px'}), 
+                                html.Td("9%", style={'border': '1px solid #ddd', 'padding': '8px'}), 
+                                html.Td("14.5%", style={'border': '1px solid #ddd', 'padding': '8px'})]),
                         html.Tr([html.Td("P90", style={'border': '1px solid #ddd', 'padding': '8px'}), 
-                                html.Td("60%", style={'border': '1px solid #ddd', 'padding': '8px'}), 
-                                html.Td("35%", style={'border': '1px solid #ddd', 'padding': '8px'}), 
-                                html.Td("5%", style={'border': '1px solid #ddd', 'padding': '8px'}), 
-                                html.Td("0%", style={'border': '1px solid #ddd', 'padding': '8px'})])
+                                html.Td("54%", style={'border': '1px solid #ddd', 'padding': '8px'}), 
+                                html.Td("31.5%", style={'border': '1px solid #ddd', 'padding': '8px'}), 
+                                html.Td("4.5%", style={'border': '1px solid #ddd', 'padding': '8px'}), 
+                                html.Td("10%", style={'border': '1px solid #ddd', 'padding': '8px'})])
                     ])
                 ], style={'width': '100%', 'borderCollapse': 'collapse', 'marginBottom': '20px'}),
                 
@@ -153,37 +153,39 @@ def create_landing_page():
                     ]),
                     html.Tbody([
                         html.Tr([html.Td("P10", style={'border': '1px solid #ddd', 'padding': '8px'}), 
-                                html.Td("17%", style={'border': '1px solid #ddd', 'padding': '8px'}), 
-                                html.Td("13%", style={'border': '1px solid #ddd', 'padding': '8px'}), 
-                                html.Td("15%", style={'border': '1px solid #ddd', 'padding': '8px'}), 
-                                html.Td("55%", style={'border': '1px solid #ddd', 'padding': '8px'})]),
+                                html.Td("15.3%", style={'border': '1px solid #ddd', 'padding': '8px'}), 
+                                html.Td("11.7%", style={'border': '1px solid #ddd', 'padding': '8px'}), 
+                                html.Td("13.5%", style={'border': '1px solid #ddd', 'padding': '8px'}), 
+                                html.Td("59.5%", style={'border': '1px solid #ddd', 'padding': '8px'})]),
                         html.Tr([html.Td("P25", style={'border': '1px solid #ddd', 'padding': '8px'}), 
-                                html.Td("30%", style={'border': '1px solid #ddd', 'padding': '8px'}), 
-                                html.Td("20%", style={'border': '1px solid #ddd', 'padding': '8px'}), 
-                                html.Td("20%", style={'border': '1px solid #ddd', 'padding': '8px'}), 
-                                html.Td("30%", style={'border': '1px solid #ddd', 'padding': '8px'})]),
+                                html.Td("27%", style={'border': '1px solid #ddd', 'padding': '8px'}), 
+                                html.Td("18%", style={'border': '1px solid #ddd', 'padding': '8px'}), 
+                                html.Td("18%", style={'border': '1px solid #ddd', 'padding': '8px'}), 
+                                html.Td("37%", style={'border': '1px solid #ddd', 'padding': '8px'})]),
                         html.Tr([html.Td("P50", style={'border': '1px solid #ddd', 'padding': '8px'}), 
-                                html.Td("40%", style={'border': '1px solid #ddd', 'padding': '8px'}), 
-                                html.Td("30%", style={'border': '1px solid #ddd', 'padding': '8px'}), 
-                                html.Td("15%", style={'border': '1px solid #ddd', 'padding': '8px'}), 
-                                html.Td("15%", style={'border': '1px solid #ddd', 'padding': '8px'})]),
+                                html.Td("36%", style={'border': '1px solid #ddd', 'padding': '8px'}), 
+                                html.Td("27%", style={'border': '1px solid #ddd', 'padding': '8px'}), 
+                                html.Td("13.5%", style={'border': '1px solid #ddd', 'padding': '8px'}), 
+                                html.Td("23.5%", style={'border': '1px solid #ddd', 'padding': '8px'})]),
                         html.Tr([html.Td("P75", style={'border': '1px solid #ddd', 'padding': '8px'}), 
-                                html.Td("50%", style={'border': '1px solid #ddd', 'padding': '8px'}), 
-                                html.Td("35%", style={'border': '1px solid #ddd', 'padding': '8px'}), 
-                                html.Td("10%", style={'border': '1px solid #ddd', 'padding': '8px'}), 
-                                html.Td("5%", style={'border': '1px solid #ddd', 'padding': '8px'})]),
+                                html.Td("45%", style={'border': '1px solid #ddd', 'padding': '8px'}), 
+                                html.Td("31.5%", style={'border': '1px solid #ddd', 'padding': '8px'}), 
+                                html.Td("9%", style={'border': '1px solid #ddd', 'padding': '8px'}), 
+                                html.Td("14.5%", style={'border': '1px solid #ddd', 'padding': '8px'})]),
                         html.Tr([html.Td("P90", style={'border': '1px solid #ddd', 'padding': '8px'}), 
-                                html.Td("60%", style={'border': '1px solid #ddd', 'padding': '8px'}), 
-                                html.Td("35%", style={'border': '1px solid #ddd', 'padding': '8px'}), 
-                                html.Td("5%", style={'border': '1px solid #ddd', 'padding': '8px'}), 
-                                html.Td("0%", style={'border': '1px solid #ddd', 'padding': '8px'})])
+                                html.Td("54%", style={'border': '1px solid #ddd', 'padding': '8px'}), 
+                                html.Td("31.5%", style={'border': '1px solid #ddd', 'padding': '8px'}), 
+                                html.Td("4.5%", style={'border': '1px solid #ddd', 'padding': '8px'}), 
+                                html.Td("10%", style={'border': '1px solid #ddd', 'padding': '8px'})])
                     ])
                 ], style={'width': '100%', 'borderCollapse': 'collapse', 'marginBottom': '20px'}),
                 
                 html.P([
                     html.Strong("Note: "), 
                     "\"Assistant Shift\" refers to students who initially pursue higher degrees but shift to assistant-level positions, taking longer to complete their education. ",
-                    "\"Not Applicable (NA)\" represents students who do not successfully complete their programs and return to their home countries."
+                    "\"Not Applicable (NA)\" represents students who do not successfully complete their programs. ",
+                    "For Kenya/Rwanda programs, NA students fail German language acquisition and never travel to Germany. ",
+                    "For Uganda, NA students drop out during studies and return to their home countries."
                 ], style={'fontSize': '14px', 'lineHeight': '1.6', 'fontStyle': 'italic', 'marginTop': '15px'}),
                 
                 html.H3("Step 3: Run Simulation", style={'color': '#2c3e50', 'marginTop': '25px'}),
@@ -201,11 +203,9 @@ def create_landing_page():
                 html.Ul([
                     html.Li([html.Strong("Percentile Tables: "), "View detailed metrics across different percentile scenarios"]),
                     html.Li([html.Strong("Impact Metrics (Utils): "), "Analyze total utility generated across scenarios"]),
-                    html.Li([html.Strong("Impact Metrics (Euros): "), "Examine financial returns across scenarios"]),
-                    html.Li([html.Strong("Utility Breakdown: "), "See the sources of utility broken down by component"]),
-                    html.Li([html.Strong("Relative Performance: "), "Compare IRR across percentile scenarios"]),
-                    html.Li([html.Strong("Percentile Comparison: "), "Compare key metrics across percentiles"]),
+                    html.Li([html.Strong("Earnings by Degree: "), "View yearly breakdown of earnings, counterfactual earnings, and remittances by degree type to verify income calculations"]),
                     html.Li([html.Strong("Yearly Cash Flow: "), "Review detailed yearly cash flow projections for the median (P50) scenario"]),
+                    html.Li([html.Strong("NPV PPP Adjusted: "), "Compare NPV PPP adjusted economic impact between programs"]),
                     html.Li([html.Strong("GiveWell Comparison: "), "Compare the ISA program's impact to GiveDirectly's cash transfer programs, using GiveWell's framework for measuring cost-effectiveness"])
                 ], style={'fontSize': '16px', 'lineHeight': '1.6', 'paddingLeft': '30px'}),
                 
@@ -276,7 +276,7 @@ def create_landing_page():
                 ], style={'fontSize': '16px', 'lineHeight': '1.6'}),
                 
                 html.Ul([
-                    html.Li([html.Strong("University (Uganda): "), "$29,000 per student"]),
+                    html.Li([html.Strong("University (Uganda): "), "$30,012 per student (GiveWell analysis)"]),
                     html.Li([html.Strong("Nursing (Kenya): "), "$16,650 per student"]),
                     html.Li([html.Strong("Trade (Rwanda): "), "$16,650 per student"])
                 ], style={'fontSize': '16px', 'lineHeight': '1.6', 'paddingLeft': '30px'}),
@@ -292,9 +292,27 @@ def create_landing_page():
                     html.Li([html.Strong("Assistant Track: "), "€31,500/year starting salary, 0.5% annual growth, 3 years to complete"]),
                     html.Li([html.Strong("Nursing Degree: "), "€40,000/year starting salary, 2% annual growth, 4 years to complete"]),
                     html.Li([html.Strong("Trade Program: "), "€35,000/year starting salary, 2% annual growth, 3 years to complete"]),
-                    html.Li([html.Strong("Failed/Home Return Track: "), "$1,100/year consumption, 1% annual growth, 2 years to 'complete'"]),
-                    html.Li([html.Strong("Salary Cap: "), "All tracks cap earnings at 1.5x starting salary to model realistic career progression"])
+                    html.Li([html.Strong("Home Return Track: "), "$4,000/year consumption, 1% annual growth, 2 years to 'complete'"]),
+                    html.Li([html.Strong("Pre-Graduation Earnings (Uganda): "), "University (Uganda) program students earn approximately $15,840/year during their studies ($1,320/month real, PPP-adjusted from €1,032/month nominal per RCT analysis)."]),
+                    html.Li([html.Strong("Pre-Graduation Earnings (Kenya/Rwanda): "), "Students earn €12,000/year during their studies in Germany (after completing German language training)."])
                 ], style={'fontSize': '16px', 'lineHeight': '1.6', 'paddingLeft': '30px'}),
+                
+                html.H3("German Language Acquisition Phase (Kenya/Rwanda Programs)", style={'color': '#2c3e50', 'marginTop': '25px'}),
+                html.P([
+                    "For the Kenya (Nursing) and Rwanda (Trade) programs, students go through a German language acquisition phase before traveling to Germany:"
+                ], style={'fontSize': '16px', 'lineHeight': '1.6'}),
+                
+                html.Ul([
+                    html.Li([html.Strong("Year 1 - German Learning: "), "Students spend 1 year in their home country learning German. During this time, they earn counterfactual income (~€511/year)."]),
+                    html.Li([html.Strong("German Acquisition: "), "At the end of the German learning year, students who successfully acquire the language travel to Germany. Students in the NA (Not Applicable) track are considered to have failed German acquisition and remain in their home country."]),
+                    html.Li([html.Strong("Study Phase in Germany: "), "Students who pass German earn €14,000/year during their studies in Germany (representing part-time work and living stipends)."]),
+                    html.Li([html.Strong("Post-Graduation: "), "After graduation, students earn according to their degree type. Those who failed German acquisition continue earning counterfactual income in their home country."]),
+                    html.Li([html.Strong("NA Track Interpretation: "), "For Kenya/Rwanda programs, the NA percentage in each scenario represents students who fail to acquire German and never travel to Germany."])
+                ], style={'fontSize': '16px', 'lineHeight': '1.6', 'paddingLeft': '30px'}),
+                
+                html.P([
+                    html.Strong("Note: "), "The Uganda (University) program does not have a German learning phase - students are assumed to already be in Germany at program start."
+                ], style={'fontSize': '14px', 'lineHeight': '1.6', 'fontStyle': 'italic', 'marginTop': '10px'}),
                 
                 html.H3("Graduation and Completion Patterns", style={'color': '#2c3e50', 'marginTop': '25px'}),
                 html.P([
@@ -316,7 +334,8 @@ def create_landing_page():
                     html.Li([html.Strong("Unemployment Rate: "), "8% base rate (with economic shocks that can cause temporary increases up to 15%)"]),
                     html.Li([html.Strong("Labor Market Exit: "), "10% probability of returning to home country for most degrees, 100% for failed tracks"]),
                     html.Li([html.Strong("Immigrant Wage Penalty: "), "Approximately 20% earnings reduction implicit in the salary parameters"]),
-                    html.Li([html.Strong("Career Progression: "), "Annual salary growth rates vary by degree type and are subject to inflation adjustments"])
+                    html.Li([html.Strong("Career Progression: "), "Annual salary growth rates vary by degree type and are subject to inflation adjustments"]),
+                    html.Li([html.Strong("Pension Smoothing: "), "Scholars working in Germany earn a state pension that provides income smoothing past retirement. The model uses a life expectancy of 81.4 years, with pension income continuing until end of life based on contributions made during working years."])
                 ], style={'fontSize': '16px', 'lineHeight': '1.6', 'paddingLeft': '30px'}),
                 
                 html.H3("Financial and Impact Calculation Parameters", style={'color': '#2c3e50', 'marginTop': '25px'}),
@@ -327,12 +346,40 @@ def create_landing_page():
                 html.Ul([
                     html.Li([html.Strong("Discount Rate: "), "4% annually for present value calculations"]),
                     html.Li([html.Strong("Investment Buffer: "), "2% of initial investment reserved as cash buffer"]),
-                    html.Li([html.Strong("PPP Multiplier: "), "0.4 purchasing power parity adjustment for German to home country earnings"]),
-                    html.Li([html.Strong("Counterfactual Baseline: "), "$511/year base consumption without migration, 1% annual growth, with HH size 5"]),
-                    html.Li([html.Strong("Remittance Rate: "), "8% of income sent as remittances to home country"]),
+                    html.Li([html.Strong("Currency Handling: "), 
+                        html.Ul([
+                            html.Li("German earnings (salaries, study income, stipends): EUR"),
+                            html.Li("Counterfactual earnings (home country): USD"),
+                            html.Li("EUR/USD Exchange Rate: 0.8458 USD per EUR"),
+                            html.Li("EUR earnings are converted to USD before comparing with counterfactual"),
+                            html.Li("Remittances: Calculated as 8% of EUR earnings, then converted to USD for utility calculations"),
+                            html.Li("ISA payments: Collected in EUR (thresholds and caps are EUR-denominated)")
+                        ], style={'paddingLeft': '30px'})
+                    ]),
+                    html.Li([html.Strong("PPP Multiplier: "), "0.4 purchasing power parity adjustment applied to USD earnings gain for home country purchasing power"]),
+                    html.Li([html.Strong("Counterfactual Household Model: "), 
+                        html.Ul([
+                            html.Li("Household size: 5 members (including control person)"),
+                            html.Li("Number of earners: 2"),
+                            html.Li("Base earnings per earner: $1,503/year (USD)"),
+                            html.Li("Per-person consumption: $601.20/year (= 2 × $1,503 ÷ 5)"),
+                            html.Li("Control earner multiplier: 1.0 (configurable to allow control to earn more than other earner)")
+                        ], style={'paddingLeft': '30px'})
+                    ]),
+                    html.Li([html.Strong("Remittance Receiving Household: "), 
+                        html.Ul([
+                            html.Li("Household size: 4 members (treated person is in Germany)"),
+                            html.Li("Number of earners: 2"),
+                            html.Li("Base earnings per earner: $1,503/year (USD)"),
+                            html.Li("Per-person base consumption: $751.50/year (= 2 × $1,503 ÷ 4)"),
+                            html.Li("Remittances received are in USD (converted from EUR at 0.8458 rate)")
+                        ], style={'paddingLeft': '30px'})
+                    ]),
+                    html.Li([html.Strong("Remittance Rate: "), "8% of EUR income sent as remittances, converted to USD for home country"]),
                     html.Li([html.Strong("Health Benefits: "), "0.00003 health utility per euro of additional income (based on GiveWell methodology)"]),
                     html.Li([html.Strong("Migration Influence: "), "5% factor for spillover effects from observing migration success"]),
-                    html.Li([html.Strong("Moral Weight: "), "Value of 1 is the value of doubling consumption for one person for one year, alpha parameter for direct income effects (GiveWell framework)"])
+                    html.Li([html.Strong("Moral Weight: "), "Value of 1 is the value of doubling consumption for one person for one year, alpha parameter for direct income effects (GiveWell framework)"]),
+                    html.Li([html.Strong("Baseline Home Return Probability: "), "84% of graduates return home (16% stay in Germany earning non-counterfactual income, per GiveWell analysis)"])
                 ], style={'fontSize': '16px', 'lineHeight': '1.6', 'paddingLeft': '30px'}),
                 
                 html.H3("Simulation Structure", style={'color': '#2c3e50', 'marginTop': '25px'}),

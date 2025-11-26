@@ -52,10 +52,17 @@ class Degree:
 @dataclass
 class CounterfactualParams:
     """Parameters for counterfactual earnings and remittances"""
-    base_earnings: float  # Base annual earnings without education
+    base_earnings: float  # Base annual earnings per earner without education (default $1,503)
     earnings_growth: float  # Annual growth rate of earnings
     remittance_rate: float  # Percentage of income sent as remittances
     employment_rate: float  # Baseline employment rate
+    # Household structure parameters
+    household_size_counterfactual: int = 5  # HH size including control (5 members)
+    household_size_remittance: int = 4  # HH size for remittance recipients (treated in Germany, so 4 members)
+    num_earners: int = 2  # Number of earners in household
+    control_earner_multiplier: float = 1.0  # Multiplier for control earner's income vs other earner(s)
+    # Treatment effect for returners (GiveWell analysis: $4000 for Uganda returners)
+    returner_treatment_effect: float = 0.0  # Additional annual income for those who return home after graduating
 
 @dataclass
 class ImpactParams:
@@ -66,6 +73,7 @@ class ImpactParams:
     health_benefit_per_euro: float = 0.00003  # Health utility gained per euro of additional income (based on GiveWell's approach)
     migration_influence_factor: float = 0.05  # Additional people who migrate due to observing success
     moral_weight: float = 1.44  # Moral weight (alpha) for direct income effects, based on GiveWell's approach
+    eur_to_usd: float = 0.8458  # Exchange rate: USD per EUR (GiveWell analysis). EUR earnings × this = USD equivalent
 
 def calculate_utility(income: float) -> float:
     """Calculate log utility for a given income level."""
@@ -89,15 +97,32 @@ class Student:
     """
     def __init__(self, degree: Degree, num_years: int, 
                  counterfactual_params: CounterfactualParams,
-                 starting_age: int = 22, retirement_age: int = 65):
-        """Initialize a student with the given degree parameters."""
+                 starting_age: int = 22, life_expectancy: float = 81.4,
+                 stipend_income: float = 0, stipend_std: float = 0,
+                 german_learning_years: int = 0, study_income: float = 0):
+        """Initialize a student with the given degree parameters.
+        
+        Args:
+            german_learning_years: Years spent learning German before traveling to Germany (0 for Uganda, 1 for Kenya/Rwanda)
+            study_income: Income earned while studying in Germany after passing German (€14k for Kenya/Rwanda)
+        """
         self.degree = degree
         self.num_years = num_years
         self.counterfactual_params = counterfactual_params
         
+        # Pre-graduation stipend (side job + stipend income while studying) - for Uganda
+        self.stipend_income = stipend_income
+        self.stipend_std = stipend_std
+        
+        # German learning phase (for Kenya/Rwanda programs)
+        self.german_learning_years = german_learning_years
+        self.study_income = study_income  # €14k during studies in Germany
+        self.passed_german = None  # None = not checked yet, True/False = result
+        self.in_germany = german_learning_years == 0  # Uganda students start in Germany
+        
         # Age tracking
         self.starting_age = starting_age
-        self.retirement_age = retirement_age
+        self.life_expectancy = life_expectancy
         self.current_age = starting_age
         
         # Career tracking
@@ -137,30 +162,83 @@ class Student:
         self.start_year = 0
 
     def has_graduated(self, relative_year: int) -> bool:
-        """Check if the student has graduated by the given year."""
-        return relative_year >= self.actual_years_to_complete
+        """Check if the student has graduated by the given year.
+        
+        For Kenya/Rwanda programs, this accounts for the German learning year.
+        """
+        return relative_year >= self.german_learning_years + self.actual_years_to_complete
 
     def calculate_earnings(self, relative_year: int, year: Year) -> float:
         """
         Calculate earnings for the given year, considering graduation status,
         employment, and career progression.
+        
+        For Kenya/Rwanda programs:
+        - Year 0: German learning phase, earn counterfactual income
+        - German acquisition check at end of learning phase
+        - If pass: travel to Germany, earn study_income (€14k) during studies
+        - If fail: stay home, earn counterfactual forever
+        - After graduation: earn degree earnings
         """
         # Update current age
         self.current_age = self.starting_age + relative_year
         
-        # Check if student has graduated
+        # If past life expectancy, no earnings
+        if self.current_age >= self.life_expectancy:
+            return 0
+        
+        # German learning phase (Year 0 for Kenya/Rwanda)
+        if relative_year < self.german_learning_years:
+            # During German learning, earn counterfactual income in home country
+            return self.calculate_counterfactual_earnings(relative_year, year)
+        
+        # Check German acquisition at end of learning phase (only once)
+        if self.german_learning_years > 0 and self.passed_german is None:
+            # NA students always fail German acquisition
+            if self.degree.name == 'NA':
+                self.passed_german = False
+            else:
+                # Non-NA students pass German and travel to Germany
+                self.passed_german = True
+            
+            self.in_germany = self.passed_german
+            
+            # If failed German, they stay in home country
+            if not self.passed_german:
+                self.will_return_home = True
+                self.is_home = True
+        
+        # If not in Germany (failed German), earn counterfactual forever
+        if self.german_learning_years > 0 and not self.in_germany:
+            return self.calculate_counterfactual_earnings(relative_year, year)
+        
+        # Check if student has graduated (accounting for German learning time)
         self.is_graduated = self.has_graduated(relative_year)
         
-        # If not graduated or past retirement, no earnings
-        if not self.is_graduated or self.current_age >= self.retirement_age:
+        # If not graduated, return study income or stipend
+        if not self.is_graduated:
+            # Kenya/Rwanda: €14k during studies in Germany
+            if self.german_learning_years > 0 and self.study_income > 0:
+                return self.study_income * year.deflator
+            # Uganda: stipend income (side job + stipend while studying)
+            elif self.stipend_income and self.stipend_income > 0:
+                return max(0, np.random.normal(self.stipend_income, self.stipend_std) * year.deflator)
             return 0
             
-        # Check if student has returned home - if so, they should not benefit from education
-        # They should earn at counterfactual levels instead
-        if self.will_return_home and relative_year >= self.actual_years_to_complete:
+        # Check if student has returned home after graduation
+        # They earn counterfactual + treatment effect (if any)
+        if self.will_return_home and relative_year >= self.german_learning_years + self.actual_years_to_complete:
             self.is_home = True
-            # Use counterfactual earnings for home returns
-            return self.calculate_counterfactual_earnings(relative_year, year)
+            # Use counterfactual earnings + treatment effect for home returns
+            base_earnings = self.calculate_counterfactual_earnings(relative_year, year)
+            # Add treatment effect (e.g., $4000 for Uganda returners per GiveWell analysis)
+            # Treatment effect is per-person consumption increase, divided by HH size
+            treatment_effect = self.counterfactual_params.returner_treatment_effect
+            if treatment_effect > 0:
+                hh_size = self.counterfactual_params.household_size_counterfactual
+                per_person_treatment = treatment_effect / hh_size
+                return base_earnings + per_person_treatment * year.deflator
+            return base_earnings
         
         # Check employment status
         if year.unemployment_rate < 1:
@@ -223,68 +301,112 @@ class Student:
         return self.earnings_power
 
     def calculate_counterfactual_earnings(self, relative_year: int, year: Year) -> float:
-        """Calculate what the student would have earned without the program."""
-        # If past retirement age, no earnings
-        if self.starting_age + relative_year >= self.retirement_age:
+        """Calculate what the student would have earned without the program.
+        
+        Uses a household model where:
+        - Household has multiple earners (default 2)
+        - Control earner can earn more than other earner(s) via multiplier
+        - Total household income is divided among all household members for consumption
+        - No unemployment modeled in counterfactual (always employed)
+        """
+        # If past life expectancy, no earnings
+        if self.starting_age + relative_year >= self.life_expectancy:
             return 0
         
-        # Simple employment check with fixed rate
-        is_employed = np.random.binomial(1, self.counterfactual_params.employment_rate) == 1
-        if not is_employed:
-            return 0
+        # Calculate total household income with multiple earners
+        # Control earner can earn more than other earner(s) via multiplier
+        params = self.counterfactual_params
+        base_earnings = params.base_earnings
         
-        # Fixed base value that grows with inflation
-        return 511 * year.deflator
+        # Total household income: control earner + other earners
+        # Control earner: base_earnings * control_earner_multiplier
+        # Other earners: base_earnings * (num_earners - 1)
+        control_income = base_earnings * params.control_earner_multiplier
+        other_earners_income = base_earnings * (params.num_earners - 1)
+        total_household_income = control_income + other_earners_income
+        
+        # Per-person consumption (divide total income by household size)
+        per_person_consumption = total_household_income / params.household_size_counterfactual
+        
+        return per_person_consumption * year.deflator
 
     def calculate_utility(self, income: float, alpha: float) -> float:
         """Calculate utility for a given income level."""
         return calculate_utility(income)
 
-    def calculate_statistics(self, year: Year) -> Dict:
-        """Calculate various statistics for the student's outcomes."""
-        # Calculate total earnings and counterfactual earnings in real terms
-        total_earnings = np.sum(self.earnings / year.deflator)
-        total_counterfactual = np.sum(self.counterfactual_earnings / year.deflator)
-        earnings_gain = total_earnings - total_counterfactual
+    def calculate_statistics(self, year: Year, eur_to_usd: float = 0.8458, ppp_multiplier: float = 0.4) -> Dict:
+        """Calculate various statistics for the student's outcomes.
         
-        # Calculate remittances (8% of earnings) in real terms
+        Note on currency handling:
+        - self.earnings: EUR (German salaries) - converted to USD for comparison/utility
+        - self.counterfactual_earnings: USD (home country)
+        - Remittances are calculated on EUR earnings, then converted to USD for utility calculations
+        - eur_to_usd: Exchange rate to convert EUR to USD (default from GiveWell analysis)
+        - ppp_multiplier: PPP adjustment for USD to home country purchasing power
+        """
+        # Convert EUR earnings to USD for comparison with counterfactual
+        earnings_usd = self.earnings * eur_to_usd
+        
+        # Calculate total earnings and counterfactual earnings in real USD terms
+        total_earnings_usd = np.sum(earnings_usd / year.deflator)
+        total_earnings_eur = np.sum(self.earnings / year.deflator)  # Keep EUR for reference
+        total_counterfactual = np.sum(self.counterfactual_earnings / year.deflator)  # Already USD
+        earnings_gain = total_earnings_usd - total_counterfactual
+        
+        # Calculate remittances in USD
+        # Remittances are sent from EUR earnings, converted to USD for receiving household
         remittance_rate = 0.08
-        remittances = self.earnings * remittance_rate / year.deflator
-        counterfactual_remittances = self.counterfactual_earnings * remittance_rate / year.deflator
-        remittance_gain = np.sum(remittances) - np.sum(counterfactual_remittances)
+        remittances_eur = self.earnings * remittance_rate / year.deflator
+        remittances_usd = remittances_eur * eur_to_usd  # Convert to USD
+        counterfactual_remittances = self.counterfactual_earnings * remittance_rate / year.deflator  # Already USD
+        remittance_gain = np.sum(remittances_usd) - np.sum(counterfactual_remittances)
         
         # Calculate student utility using GiveWell's approach with moral weight of 1.44
+        # All amounts in USD for consistent comparison
         moral_weight = 1.44  # GiveWell's moral weight (alpha)
         student_utility = np.sum([
-            moral_weight * calculate_utility(e/d - r/d)
-            for e, r, d in zip(self.earnings, remittances, [year.deflator] * len(self.earnings))
+            moral_weight * calculate_utility(e - r)  # Both in USD now
+            for e, r in zip(earnings_usd / year.deflator, remittances_usd)
         ])
         counterfactual_utility = np.sum([
-            moral_weight * calculate_utility(e/d - r/d)
-            for e, r, d in zip(self.counterfactual_earnings, counterfactual_remittances, [year.deflator] * len(self.counterfactual_earnings))
+            moral_weight * calculate_utility(e - r)
+            for e, r in zip(self.counterfactual_earnings / year.deflator, counterfactual_remittances)
         ])
         utility_gain = student_utility - counterfactual_utility
         
-        # Calculate remittance utility (4 family members)
-        base_consumption = 511  # Updated to match GiveWell's BOTEC
+        # Calculate remittance utility using household model
+        # Receiving household: 4 members (treated in Germany), 2 earners
+        # Remittances are in USD, base_earnings is in USD - now consistent
+        params = self.counterfactual_params
         remittance_utility = np.sum([
-            calculate_remittance_utility(r/d, base_consumption)
-            for r, d in zip(remittances, [year.deflator] * len(remittances))
+            calculate_remittance_utility(
+                r,  # Already in USD
+                base_earner_income=params.base_earnings,  # USD
+                num_earners=params.num_earners,
+                household_size_remittance=params.household_size_remittance,
+                moral_weight=moral_weight
+            )
+            for r in remittances_usd
         ])
         counterfactual_remittance_utility = np.sum([
-            calculate_remittance_utility(r/d, base_consumption)
-            for r, d in zip(counterfactual_remittances, [year.deflator] * len(counterfactual_remittances))
+            calculate_remittance_utility(
+                r,  # Already in USD
+                base_earner_income=params.base_earnings,  # USD
+                num_earners=params.num_earners,
+                household_size_remittance=params.household_size_remittance,
+                moral_weight=moral_weight
+            )
+            for r in counterfactual_remittances
         ])
         remittance_utility_gain = remittance_utility - counterfactual_remittance_utility
         
-        # Calculate PPP-adjusted earnings gain (applying PPP multiplier to convert German earnings to Ugandan equivalent)
-        ppp_adjusted_earnings_gain = earnings_gain * 0.4
+        # Calculate PPP-adjusted earnings gain (USD earnings gain converted to home country purchasing power)
+        ppp_adjusted_earnings_gain = earnings_gain * ppp_multiplier
         
         # Calculate health benefits using GiveWell's approach
         # Life expectancy improvement from 62 to 81 years (19 years)
         # Value of 40 units for this improvement, discounted at 4%
-        # This results in approximately 3 utils per student, which is a fraction of income utility (about 160)
-        health_utility = 3.0  # Fixed value based on GiveWell's approach
+        health_utility = 4.29  # Fixed value based on GiveWell's approach
         
         # Calculate follow-the-leader migration effects
         migration_utility = 0
@@ -294,9 +416,9 @@ class Student:
             migration_utility = (utility_gain + remittance_utility_gain) * 0.05
         
         return {
-            'earnings_gain': earnings_gain,
-            'ppp_adjusted_earnings_gain': ppp_adjusted_earnings_gain,
-            'remittance_gain': remittance_gain,
+            'earnings_gain': earnings_gain,  # USD
+            'ppp_adjusted_earnings_gain': ppp_adjusted_earnings_gain,  # USD PPP-adjusted
+            'remittance_gain': remittance_gain,  # USD
             'utility_gains': {
                 'student_utility_gain': utility_gain,
                 'remittance_utility_gain': remittance_utility_gain,
@@ -304,10 +426,12 @@ class Student:
             },
             'health_utility': health_utility,
             'migration_utility': migration_utility,
-            'total_earnings': total_earnings,
-            'total_counterfactual': total_counterfactual,
-            'total_remittances': np.sum(remittances),
-            'total_counterfactual_remittances': np.sum(counterfactual_remittances)
+            'total_earnings': total_earnings_usd,  # USD
+            'total_earnings_eur': total_earnings_eur,  # EUR for reference
+            'total_counterfactual': total_counterfactual,  # USD
+            'total_remittances': np.sum(remittances_usd),  # USD
+            'total_remittances_eur': np.sum(remittances_eur),  # EUR for reference
+            'total_counterfactual_remittances': np.sum(counterfactual_remittances)  # USD
         }
 
 @dataclass
@@ -406,7 +530,10 @@ class InvestmentPool:
                     # If they've made significant payments (>50% of cap), mark as years_cap
                     if np.sum(student.payments) >= self.isa_cap * 0.5:
                         self.mark_contract_exit(contract.student_id, 'years_cap')
-                    # If they're still in school or recently graduated, mark as home_return
+                    # If they failed German acquisition (Kenya/Rwanda) or returned home
+                    elif student.is_home:
+                        self.mark_contract_exit(contract.student_id, 'home_return')
+                    # If they're graduated and will return home
                     elif student.is_graduated and student.will_return_home:
                         self.mark_contract_exit(contract.student_id, 'home_return')
                     # Otherwise mark as default
@@ -429,23 +556,45 @@ class InvestmentPool:
         
         return np.log(end_value / start_value) / years
 
-def calculate_remittance_utility(remittance_amount: float, base_consumption: float = 511, num_recipients: int = 4) -> float:
+def calculate_remittance_utility(remittance_amount: float, base_consumption: float = None, 
+                                  num_recipients: int = None, base_earner_income: float = 1503,
+                                  num_earners: int = 2, household_size_remittance: int = 4,
+                                  moral_weight: float = 1.44) -> float:
     """
     Calculate utility gain from remittances for family members.
     Uses GiveWell's approach of comparing log utilities of consumption with and without remittances.
     
+    The receiving household model:
+    - Household has num_earners earners (default 2), each earning base_earner_income
+    - Treated person is in Germany, so household size is household_size_remittance (default 4)
+    - Total household income is divided among all household members for base consumption
+    - Remittances are added to this base consumption
+    
     Args:
         remittance_amount: Annual remittance amount
-        base_consumption: Base annual consumption per family member (€511 from GiveWell BOTEC)
-        num_recipients: Number of family members receiving remittances
+        base_consumption: Base annual consumption per family member (if None, calculated from household model)
+        num_recipients: Number of family members receiving remittances (if None, uses household_size_remittance)
+        base_earner_income: Annual income per earner in the receiving household (default $1,503)
+        num_earners: Number of earners in the receiving household (default 2)
+        household_size_remittance: Size of receiving household (default 4, since treated is in Germany)
+        moral_weight: Moral weight (alpha) for remittance utility, default 1.44 based on GiveWell
         
     Returns:
-        Total utility gain from remittances across all recipients
+        Total utility gain from remittances across all recipients (with moral weight applied)
     """
     if remittance_amount <= 0:
         return 0
+    
+    # Use household model defaults if not specified
+    if num_recipients is None:
+        num_recipients = household_size_remittance
+    
+    # Calculate base consumption from household earnings if not specified
+    if base_consumption is None:
+        total_household_income = base_earner_income * num_earners
+        base_consumption = total_household_income / household_size_remittance
         
-    # Each recipient gets an equal share
+    # Each recipient gets an equal share of remittances
     remittance_per_person = remittance_amount / num_recipients
     
     # Calculate utility gain per person: ln(base + remittance) - ln(base)
@@ -455,10 +604,10 @@ def calculate_remittance_utility(remittance_amount: float, base_consumption: flo
     # Apply household multiplier of 1.2 from GiveWell BOTEC
     household_multiplier = 1.2
     
-    # Total utility gain across all recipients with household multiplier
-    # According to GiveWell, this should be about 6.4 utils in the first year
+    # Total utility gain across all recipients with household multiplier and moral weight
+    # According to GiveWell, this should be about 6.4 utils in the first year (before moral weight)
     # And about 63-101 utils when properly discounted over lifetime
-    return utility_gain_per_person * num_recipients * household_multiplier
+    return moral_weight * utility_gain_per_person * num_recipients * household_multiplier
 
 def calculate_student_utility(earnings: float, counterfactual: float, remittance: float, moral_weight: float = 1.44) -> float:
     """
@@ -486,7 +635,9 @@ def calculate_student_utility(earnings: float, counterfactual: float, remittance
     # Apply moral weight (alpha) to log utility
     return moral_weight * np.log(net_gain)
 
-def calculate_total_utility(earnings: float, counterfactual: float, remittance_rate: float, moral_weight: float = 1.44) -> Dict[str, float]:
+def calculate_total_utility(earnings: float, counterfactual: float, remittance_rate: float, moral_weight: float = 1.44,
+                           base_earner_income: float = 1503, num_earners: int = 2, 
+                           household_size_remittance: int = 4) -> Dict[str, float]:
     """
     Calculate total utility including both student and remittance impacts.
     
@@ -495,6 +646,9 @@ def calculate_total_utility(earnings: float, counterfactual: float, remittance_r
         counterfactual: Counterfactual earnings
         remittance_rate: Percentage of earnings sent as remittances
         moral_weight: Moral weight (alpha) for direct income effects
+        base_earner_income: Annual income per earner in receiving household (default $1,503)
+        num_earners: Number of earners in receiving household (default 2)
+        household_size_remittance: Size of receiving household (default 4)
         
     Returns:
         Dictionary containing student utility, remittance utility, and total utility
@@ -502,7 +656,13 @@ def calculate_total_utility(earnings: float, counterfactual: float, remittance_r
     remittance = earnings * remittance_rate
     
     student_utility = calculate_student_utility(earnings, counterfactual, remittance, moral_weight)
-    remittance_utility = calculate_remittance_utility(remittance)
+    remittance_utility = calculate_remittance_utility(
+        remittance,
+        base_earner_income=base_earner_income,
+        num_earners=num_earners,
+        household_size_remittance=household_size_remittance,
+        moral_weight=moral_weight
+    )
     
     return {
         'student_utility': student_utility,
@@ -522,52 +682,85 @@ def calculate_student_statistics(student: Student, num_years: int, remittance_ra
     
     Returns:
     - Dictionary of student statistics
-    """
-    # Calculate lifetime earnings (undiscounted sum)
-    lifetime_earnings = np.sum(student.earnings)
     
-    # Calculate real (present value) earnings, discounted to absolute simulation year 0
-    if len(student.earnings) == 0:
-        lifetime_real_earnings = 0.0
+    Note on currency handling:
+    - student.earnings: EUR (German salaries) - converted to USD for comparison/utility
+    - student.counterfactual_earnings: USD (home country)
+    - Remittances are calculated on EUR earnings, then converted to USD for utility calculations
+    - The eur_to_usd rate converts EUR to USD: EUR_amount * eur_to_usd = USD_amount
+    """
+    # FX conversion rate (EUR to USD)
+    eur_to_usd = impact_params.eur_to_usd
+    
+    # Convert EUR earnings to USD for comparison with counterfactual
+    # student.earnings are in EUR (German salaries)
+    # student.counterfactual_earnings are in USD (home country earnings)
+    earnings_usd = student.earnings * eur_to_usd
+    
+    # Calculate lifetime earnings in USD (undiscounted sum)
+    lifetime_earnings_usd = np.sum(earnings_usd)
+    
+    # Keep EUR earnings for reference (ISA calculations use EUR)
+    lifetime_earnings_eur = np.sum(student.earnings)
+    
+    # Calculate real (present value) earnings in USD, discounted to absolute simulation year 0
+    if len(earnings_usd) == 0:
+        lifetime_real_earnings_usd = 0.0
     else:
         # 't' is the index relative to the start of the student's earnings array.
         # Earning at student.earnings[t] occurred in absolute simulation year 'student.start_year + t'.
-        discount_factors_for_pv_earnings = np.array([(1 / (1 + impact_params.discount_rate)) ** (student.start_year + t) for t in range(len(student.earnings))])
-        lifetime_real_earnings = np.sum(student.earnings * discount_factors_for_pv_earnings)
+        discount_factors_for_pv_earnings = np.array([(1 / (1 + impact_params.discount_rate)) ** (student.start_year + t) for t in range(len(earnings_usd))])
+        lifetime_real_earnings_usd = np.sum(earnings_usd * discount_factors_for_pv_earnings)
     
-    # Calculate counterfactual lifetime earnings (undiscounted sum)
+    # Calculate counterfactual lifetime earnings (undiscounted sum) - already in USD
     counterfactual_lifetime_earnings = np.sum(student.counterfactual_earnings) 
 
-    # Calculate remittances (based on undiscounted earnings)
-    lifetime_remittances = lifetime_earnings * remittance_rate
+    # Calculate remittances in USD
+    # Remittances are sent from EUR earnings, converted to USD for receiving household
+    # remittance_rate is applied to EUR earnings, then converted to USD
+    lifetime_remittances_eur = lifetime_earnings_eur * remittance_rate
+    lifetime_remittances_usd = lifetime_remittances_eur * eur_to_usd
     counterfactual_remittances = counterfactual_lifetime_earnings * impact_params.counterfactual.remittance_rate
     
     # Calculate yearly utilities with proper discounting to absolute simulation year 0
+    # All utility calculations use USD amounts for consistency
     yearly_utilities = []
     yearly_counterfactual_utilities = []
+    
+    # Get household parameters from counterfactual params
+    cf_params = impact_params.counterfactual
     
     for idx_relative_to_student_earnings in range(len(student.earnings)):
         absolute_simulation_year = student.start_year + idx_relative_to_student_earnings
         discount_factor = (1 / (1 + impact_params.discount_rate)) ** absolute_simulation_year
         
-        # Calculate per-year undiscounted utilities
+        # Convert this year's EUR earnings to USD
+        year_earnings_usd = student.earnings[idx_relative_to_student_earnings] * eur_to_usd
+        
+        # Calculate per-year undiscounted utilities (all in USD)
         year_utils = calculate_total_utility(
-            student.earnings[idx_relative_to_student_earnings],
-            student.counterfactual_earnings[idx_relative_to_student_earnings],
-            remittance_rate,
-            impact_params.moral_weight
+            year_earnings_usd,  # USD
+            student.counterfactual_earnings[idx_relative_to_student_earnings],  # USD
+            remittance_rate,  # Rate applied to USD earnings
+            impact_params.moral_weight,
+            base_earner_income=cf_params.base_earnings,  # USD
+            num_earners=cf_params.num_earners,
+            household_size_remittance=cf_params.household_size_remittance
         )
         # Discount and store
         for key in year_utils:
             year_utils[key] *= discount_factor
         yearly_utilities.append(year_utils)
         
-        # Calculate per-year undiscounted counterfactual utilities
+        # Calculate per-year undiscounted counterfactual utilities (already in USD)
         counterfactual_utils = calculate_total_utility(
-            student.counterfactual_earnings[idx_relative_to_student_earnings],
+            student.counterfactual_earnings[idx_relative_to_student_earnings],  # USD
             0,  # No counterfactual to counterfactual
-            impact_params.counterfactual.remittance_rate,
-            impact_params.moral_weight
+            cf_params.remittance_rate,
+            impact_params.moral_weight,
+            base_earner_income=cf_params.base_earnings,  # USD
+            num_earners=cf_params.num_earners,
+            household_size_remittance=cf_params.household_size_remittance
         )
         # Discount and store
         for key in counterfactual_utils:
@@ -590,17 +783,25 @@ def calculate_student_statistics(student: Student, num_years: int, remittance_ra
     }
     
     years_employed = np.sum(student.employment_history)
-    total_isa_payments = np.sum(student.payments) # Undiscounted sum
+    total_isa_payments = np.sum(student.payments) # Undiscounted sum, in EUR
     
-    # PPP-adjusted earnings gain (based on undiscounted lifetime earnings gain)
-    ppp_adjusted_earnings_gain = (lifetime_earnings - counterfactual_lifetime_earnings) * impact_params.ppp_multiplier
+    # Earnings gain in USD (both amounts now in USD)
+    earnings_gain_usd = lifetime_earnings_usd - counterfactual_lifetime_earnings
+    
+    # Remittance gain in USD
+    remittance_gain_usd = lifetime_remittances_usd - counterfactual_remittances
+    
+    # PPP-adjusted earnings gain (based on undiscounted USD earnings gain)
+    # PPP multiplier converts USD to home country purchasing power
+    ppp_adjusted_earnings_gain = earnings_gain_usd * impact_params.ppp_multiplier
     
     # Health utility: Fixed value of 3.0 utils, discounted to PV from graduation time.
     health_utility_pv = 0.0
     if student.is_graduated:
         # student.actual_years_to_complete is relative to the student's start.
-        year_of_health_benefit_realization = student.start_year + student.actual_years_to_complete
-        health_utility_pv = 3.0 * ((1 / (1 + impact_params.discount_rate)) ** year_of_health_benefit_realization)
+        # For Kenya/Rwanda, add german_learning_years to account for time before studies began
+        year_of_health_benefit_realization = student.start_year + student.german_learning_years + student.actual_years_to_complete
+        health_utility_pv = 4.29 * ((1 / (1 + impact_params.discount_rate)) ** year_of_health_benefit_realization)
 
     # Migration utility (based on already discounted total_utility_gain)
     migration_utility_pv = 0.0
@@ -619,19 +820,21 @@ def calculate_student_statistics(student: Student, num_years: int, remittance_ra
         'degree_type': student.degree.name,
         'graduated': student.is_graduated,
         'dropped_out': not student.is_graduated,
-        'lifetime_earnings': lifetime_earnings,  # Undiscounted
-        'lifetime_real_earnings': lifetime_real_earnings,  # Discounted to year 0
-        'counterfactual_lifetime_earnings': counterfactual_lifetime_earnings,  # Undiscounted
-        'earnings_gain': lifetime_earnings - counterfactual_lifetime_earnings,  # Undiscounted
-        'ppp_adjusted_earnings_gain': ppp_adjusted_earnings_gain,  # Based on undiscounted gain
-        'lifetime_remittances': lifetime_remittances,  # Undiscounted
-        'counterfactual_remittances': counterfactual_remittances,  # Undiscounted
-        'remittance_gain': lifetime_remittances - counterfactual_remittances,  # Undiscounted
+        'lifetime_earnings': lifetime_earnings_usd,  # USD, undiscounted
+        'lifetime_earnings_eur': lifetime_earnings_eur,  # EUR, undiscounted (for reference)
+        'lifetime_real_earnings': lifetime_real_earnings_usd,  # USD, discounted to year 0
+        'counterfactual_lifetime_earnings': counterfactual_lifetime_earnings,  # USD, undiscounted
+        'earnings_gain': earnings_gain_usd,  # USD, undiscounted
+        'ppp_adjusted_earnings_gain': ppp_adjusted_earnings_gain,  # USD PPP-adjusted
+        'lifetime_remittances': lifetime_remittances_usd,  # USD, undiscounted
+        'lifetime_remittances_eur': lifetime_remittances_eur,  # EUR, undiscounted (for reference)
+        'counterfactual_remittances': counterfactual_remittances,  # USD, undiscounted
+        'remittance_gain': remittance_gain_usd,  # USD, undiscounted
         'utility_gains': utility_gains,  # All components are PVs
         'health_utility': health_utility_pv,  # PV of fixed health utility
         'migration_utility': migration_utility_pv,  # PV of migration utility
         'years_employed': years_employed,
-        'total_isa_payments': total_isa_payments,  # Undiscounted sum
+        'total_isa_payments': total_isa_payments,  # EUR, undiscounted sum
         'years_paid_isa': student.years_paid,
         'hit_payment_cap': student.hit_cap,
         'yearly_utilities': yearly_utilities,  # List of dicts, values already discounted to year 0
@@ -646,7 +849,7 @@ def simulate_impact(
     num_sims: int = 1,
     scenario: str = 'baseline',
     remittance_rate: float = 0.08,
-    home_prob: float = 0.1,
+    home_prob: float = 0,
     data_callback: Optional[Callable] = None,
     isa_percentage: Optional[float] = None,
     isa_cap: Optional[float] = None,
@@ -654,7 +857,9 @@ def simulate_impact(
     price_per_student: Optional[float] = None,
     initial_inflation_rate: float = 0.02,
     initial_unemployment_rate: float = 0.1,
-    degree_params: Optional[List[tuple]] = None
+    degree_params: Optional[List[tuple]] = None,
+    stipend_income: Optional[float] = None,
+    stipend_std: Optional[float] = None
 ) -> Dict:
     """
     Run a simulation of the impact of an ISA program.
@@ -676,6 +881,8 @@ def simulate_impact(
     - initial_inflation_rate: Initial inflation rate
     - initial_unemployment_rate: Initial unemployment rate
     - degree_params: Custom degree parameters
+    - stipend_income: Pre-graduation stipend income (e.g. side job + stipend in Germany)
+    - stipend_std: Standard deviation of stipend income
     
     Returns:
     - Dictionary of simulation results
@@ -706,13 +913,33 @@ def simulate_impact(
     
     if price_per_student is None:
         if program_type == 'University':  # Uganda program
-            price_per_student = 29000
+            price_per_student = 30012  # GiveWell analysis cost per student
         elif program_type == 'Nurse':     # Kenya program
             price_per_student = 16650
         elif program_type == 'Trade':     # Rwanda program
             price_per_student = 16650
         else:
             raise ValueError("Program type must be 'University' (Uganda), 'Nurse' (Kenya), or 'Trade' (Rwanda)")
+    
+    # Set default stipend for University (Uganda) program - represents side job + first year stipend
+    # Uganda students are already in Germany, so no German learning phase
+    # GiveWell: $1032/month nominal = $1320/month real (PPP-adjusted) = $15,840/year real
+    if program_type == 'University':
+        if stipend_income is None:
+            stipend_income = 15840  # GiveWell: $1320/month real (PPP-adjusted) × 12 months
+        if stipend_std is None:
+            stipend_std = 1500  # Proportionally scaled std dev
+        german_learning_years = 0
+        study_income = 0
+    else:
+        # Kenya/Rwanda programs have 1 year German learning phase
+        # Students earn counterfactual income during German learning, then €14k during studies
+        if stipend_income is None:
+            stipend_income = 0
+        if stipend_std is None:
+            stipend_std = 0
+        german_learning_years = 1
+        study_income = 14000  # €14k/year during studies in Germany
     
     # Initialize economic conditions
     year = Year(
@@ -747,7 +974,9 @@ def simulate_impact(
     students = []
     for i in range(60):  # Start with 60 students
         degree_type = np.random.choice([d[0] for d in degrees_with_weights], p=[d[1] for d in degrees_with_weights])
-        student = Student(degree_type, num_years, impact_params.counterfactual)
+        student = Student(degree_type, num_years, impact_params.counterfactual,
+                         stipend_income=stipend_income, stipend_std=stipend_std,
+                         german_learning_years=german_learning_years, study_income=study_income)
         student.id = i
         students.append(student)
         pool.add_student(student)  # Add student to pool
@@ -756,6 +985,9 @@ def simulate_impact(
     
     # Track yearly data
     yearly_data = []
+    
+    # Track earnings by degree type each year
+    earnings_by_degree_yearly = []
     
     # Run simulation
     for i in range(num_years):
@@ -775,8 +1007,14 @@ def simulate_impact(
             counterfactual = student.calculate_counterfactual_earnings(relative_year, year)
             student.counterfactual_earnings[relative_year] = counterfactual
             
-            # Check for home return
-            if student.is_graduated and student.will_return_home and relative_year >= student.actual_years_to_complete:
+            # Check for German failure (Kenya/Rwanda students who didn't acquire German)
+            if student.german_learning_years > 0 and student.passed_german == False and relative_year == student.german_learning_years:
+                # They failed German at the end of learning phase, mark as home return
+                pool.mark_contract_exit(student.id, 'home_return')
+                continue
+            
+            # Check for home return after graduation
+            if student.is_graduated and student.will_return_home and relative_year >= student.german_learning_years + student.actual_years_to_complete:
                 # Mark contract as exited
                 pool.mark_contract_exit(student.id, 'home_return')
                 # Note: earnings are already handled in calculate_earnings method
@@ -822,6 +1060,71 @@ def simulate_impact(
                     # Update pool
                     pool.receive_payment(payment / year.deflator, student.id)
         
+        # Collect earnings by degree type for this year
+        # Note: student.earnings are in EUR, student.counterfactual_earnings are in USD
+        # We track both EUR and USD values for transparency
+        eur_to_usd = impact_params.eur_to_usd
+        degree_earnings = {}
+        for student in students:
+            if i < student.start_year:
+                continue
+            relative_year = i - student.start_year
+            degree_name = student.degree.name
+            
+            if degree_name not in degree_earnings:
+                degree_earnings[degree_name] = {
+                    'count': 0,
+                    'total_earnings_eur': 0.0,  # EUR earnings
+                    'total_earnings_usd': 0.0,  # EUR earnings converted to USD
+                    'total_counterfactual': 0.0,  # USD (home country)
+                    'total_remittances_eur': 0.0,  # EUR remittances
+                    'total_remittances_usd': 0.0,  # EUR remittances converted to USD
+                    'graduated_count': 0,
+                    'in_germany_count': 0,
+                    'at_home_count': 0
+                }
+            
+            earnings_eur = student.earnings[relative_year]
+            earnings_usd = earnings_eur * eur_to_usd
+            counterfactual_usd = student.counterfactual_earnings[relative_year]
+            remittances_eur = earnings_eur * remittance_rate
+            remittances_usd = remittances_eur * eur_to_usd
+            
+            degree_earnings[degree_name]['count'] += 1
+            degree_earnings[degree_name]['total_earnings_eur'] += earnings_eur
+            degree_earnings[degree_name]['total_earnings_usd'] += earnings_usd
+            degree_earnings[degree_name]['total_counterfactual'] += counterfactual_usd
+            degree_earnings[degree_name]['total_remittances_eur'] += remittances_eur
+            degree_earnings[degree_name]['total_remittances_usd'] += remittances_usd
+            
+            if student.is_graduated:
+                degree_earnings[degree_name]['graduated_count'] += 1
+            if hasattr(student, 'in_germany') and student.in_germany:
+                degree_earnings[degree_name]['in_germany_count'] += 1
+            if student.is_home:
+                degree_earnings[degree_name]['at_home_count'] += 1
+        
+        # Calculate averages
+        for degree_name in degree_earnings:
+            count = degree_earnings[degree_name]['count']
+            if count > 0:
+                degree_earnings[degree_name]['avg_earnings'] = degree_earnings[degree_name]['total_earnings_usd'] / count  # USD for comparison
+                degree_earnings[degree_name]['avg_earnings_eur'] = degree_earnings[degree_name]['total_earnings_eur'] / count
+                degree_earnings[degree_name]['avg_counterfactual'] = degree_earnings[degree_name]['total_counterfactual'] / count
+                degree_earnings[degree_name]['avg_remittances'] = degree_earnings[degree_name]['total_remittances_usd'] / count  # USD for comparison
+                degree_earnings[degree_name]['avg_remittances_eur'] = degree_earnings[degree_name]['total_remittances_eur'] / count
+            else:
+                degree_earnings[degree_name]['avg_earnings'] = 0
+                degree_earnings[degree_name]['avg_earnings_eur'] = 0
+                degree_earnings[degree_name]['avg_counterfactual'] = 0
+                degree_earnings[degree_name]['avg_remittances'] = 0
+                degree_earnings[degree_name]['avg_remittances_eur'] = 0
+        
+        earnings_by_degree_yearly.append({
+            'year': i,
+            'by_degree': degree_earnings
+        })
+        
         # End year and capture data
         returns = pool.end_year()
         
@@ -839,7 +1142,9 @@ def simulate_impact(
             
             for _ in range(num_new_students):
                 degree_type = np.random.choice([d[0] for d in degrees_with_weights], p=[d[1] for d in degrees_with_weights])
-                student = Student(degree_type, num_years - i, impact_params.counterfactual)
+                student = Student(degree_type, num_years - i, impact_params.counterfactual,
+                                 stipend_income=stipend_income, stipend_std=stipend_std,
+                                 german_learning_years=german_learning_years, study_income=study_income)
                 student.id = len(students)
                 student.start_year = i
                 students.append(student)
@@ -901,7 +1206,7 @@ def simulate_impact(
         
         for student in students:
             if student.is_graduated:
-                stats = student.calculate_statistics(year)
+                stats = student.calculate_statistics(year, eur_to_usd=impact_params.eur_to_usd, ppp_multiplier=impact_params.ppp_multiplier)
                 total_student_utility += stats['utility_gains']['student_utility_gain']
                 total_remittance_utility += stats['utility_gains']['remittance_utility_gain']
                 total_health_utility += stats['health_utility']
@@ -950,7 +1255,8 @@ def simulate_impact(
         'contract_metrics': pool.contract_metrics,
         'yearly_data': yearly_data,
         'student_metrics': student_metrics,
-        'total_payments': total_payments
+        'total_payments': total_payments,
+        'earnings_by_degree_yearly': earnings_by_degree_yearly
     }
 
 def run_impact_simulation(
@@ -961,7 +1267,7 @@ def run_impact_simulation(
     num_sims: int = 1,
     scenario: str = 'baseline',
     remittance_rate: float = 0.15,
-    home_prob: float = 0.1,
+    home_prob: float = 0,
     data_callback: Optional[Callable] = None,
     isa_percentage: Optional[float] = None,
     isa_cap: Optional[float] = None,
@@ -969,7 +1275,9 @@ def run_impact_simulation(
     price_per_student: Optional[float] = None,
     initial_inflation_rate: float = 0.02,
     initial_unemployment_rate: float = 0.1,
-    degree_params: Optional[List[tuple]] = None
+    degree_params: Optional[List[tuple]] = None,
+    stipend_income: Optional[float] = None,
+    stipend_std: Optional[float] = None
 ) -> Dict:
     """
     Run multiple simulations of the ISA program and aggregate results.
@@ -991,6 +1299,8 @@ def run_impact_simulation(
         initial_inflation_rate (float): Starting inflation rate
         initial_unemployment_rate (float): Starting unemployment rate
         degree_params (List[tuple], optional): List of (DegreeParams, weight) tuples
+        stipend_income (float, optional): Pre-graduation stipend income (e.g. side job + stipend in Germany)
+        stipend_std (float, optional): Standard deviation of stipend income
         
     Returns:
         dict: Aggregated simulation results
@@ -1018,7 +1328,7 @@ def run_impact_simulation(
     
     if price_per_student is None:
         if program_type == 'University':  # Uganda program
-            price_per_student = 29000
+            price_per_student = 30012  # GiveWell analysis cost per student
         elif program_type == 'Nurse':     # Kenya program
             price_per_student = 16650
         elif program_type == 'Trade':     # Rwanda program
@@ -1049,7 +1359,9 @@ def run_impact_simulation(
             price_per_student=price_per_student,
             initial_inflation_rate=initial_inflation_rate,
             initial_unemployment_rate=initial_unemployment_rate,
-            degree_params=degree_params
+            degree_params=degree_params,
+            stipend_income=stipend_income,
+            stipend_std=stipend_std
         )
         simulation_results.append(result)
     
@@ -1324,13 +1636,13 @@ def main():
     parser.add_argument('--investment', type=float, default=1000000, help='Initial investment amount')
     parser.add_argument('--years', type=int, default=55, help='Number of years to simulate')
     parser.add_argument('--remittance-rate', type=float, default=0.1, help='Remittance rate')
-    parser.add_argument('--home-prob', type=float, default=0.1, help='Probability of returning home')
+    parser.add_argument('--home-prob', type=float, default=0.84, help='Probability of returning home (GiveWell baseline: 84%, meaning 16% stay earning non-counterfactual income)')
     
     args = parser.parse_args()
     
     # Get price per student based on program type
     if args.program == 'University':
-        price_per_student = 29000
+        price_per_student = 30012  # GiveWell analysis cost per student
         program_display_name = 'Uganda'
     elif args.program == 'Nurse':
         price_per_student = 16650
@@ -1356,13 +1668,25 @@ def main():
         np.random.seed(args.seed)
     
     # Set up impact parameters
+    # Counterfactual household model:
+    # - 5 members in counterfactual household (including control)
+    # - 2 earners, each earning $1,503/year
+    # - Per-person consumption = (2 * $1,503) / 5 = $601.20
+    # Remittance receiving household:
+    # - 4 members (treated is in Germany)
+    # - 2 earners, each earning $1,503/year
+    
     impact_params = ImpactParams(
         discount_rate=0.04,
         counterfactual=CounterfactualParams(
-            base_earnings=511,
+            base_earnings=1503,  # Base earnings per earner ($1,503/year) - matches spouse income in GiveWell
             earnings_growth=0.01,
             remittance_rate=0.0,
-            employment_rate=0.9
+            employment_rate=1.0,  # No longer used - counterfactual assumes full employment
+            household_size_counterfactual=5,  # HH size including control (GiveWell: 5)
+            household_size_remittance=4,  # HH size for remittance recipients (treated in Germany)
+            num_earners=2,  # Number of earners in household
+            control_earner_multiplier=1.0  # Control earner earns same as other earner
         ),
         ppp_multiplier=0.42,
         health_benefit_per_euro=0.00003,

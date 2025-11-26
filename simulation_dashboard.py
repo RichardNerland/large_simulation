@@ -27,11 +27,22 @@ from impact_isa_model import (
 from landing_page import create_landing_page
 
 # Set up default impact parameters
+# Counterfactual household model:
+# - 5 members in counterfactual household (including control)
+# - 2 earners, each earning $1,503/year
+# - Per-person consumption = (2 * $1,503) / 5 = $601.20
+# Remittance receiving household:
+# - 4 members (treated is in Germany)
+# - 2 earners, each earning $1,503/year
 counterfactual_params = CounterfactualParams(
-    base_earnings=511,
+    base_earnings=1503,  # Base earnings per earner ($1,503/year) - matches GiveWell spouse income
     earnings_growth=0.01,
     remittance_rate=0.0,
-    employment_rate=0.7
+    employment_rate=1.0,  # No longer used - counterfactual assumes full employment
+    household_size_counterfactual=5,  # HH size including control (GiveWell: 5)
+    household_size_remittance=4,  # HH size for remittance recipients (treated in Germany)
+    num_earners=2,  # Number of earners in household
+    control_earner_multiplier=1.0  # Control earner earns same as other earner
 )
 
 impact_params = ImpactParams(
@@ -40,13 +51,15 @@ impact_params = ImpactParams(
     ppp_multiplier=0.4,
     health_benefit_per_euro=0.00003,
     migration_influence_factor=0.05,
-    moral_weight=1.44
+    moral_weight=1.44,
+    eur_to_usd=0.8458  # GiveWell exchange rate: USD per EUR
 )
 
 # Cache for precomputed percentile scenarios
 CACHE_DIR = "cache"
 cached_results = {}
 cached_yearly_data = {}
+cached_earnings_by_degree = {}
 
 # Function to get cache filename for a scenario
 def get_cache_filename(program_type, percentile):
@@ -55,9 +68,12 @@ def get_cache_filename(program_type, percentile):
 def get_yearly_data_filename(program_type, percentile):
     return f"{CACHE_DIR}/{program_type}_{percentile}_yearly.parquet"
 
+def get_earnings_by_degree_filename(program_type, percentile):
+    return f"{CACHE_DIR}/{program_type}_{percentile}_earnings_by_degree.pkl"
+
 # Function to load cached results
 def load_cached_results():
-    global cached_results, cached_yearly_data
+    global cached_results, cached_yearly_data, cached_earnings_by_degree
     try:
         if not os.path.exists(CACHE_DIR):
             os.makedirs(CACHE_DIR)
@@ -65,12 +81,14 @@ def load_cached_results():
         # Initialize empty caches
         cached_results = {}
         cached_yearly_data = {}
+        cached_earnings_by_degree = {}
         
         # Load all cached files
         for program_type in ['University', 'Nurse', 'Trade']:
             for percentile in ['p10', 'p25', 'p50', 'p75', 'p90']:
                 results_filename = get_cache_filename(program_type, percentile)
                 yearly_filename = get_yearly_data_filename(program_type, percentile)
+                earnings_by_degree_filename = get_earnings_by_degree_filename(program_type, percentile)
                 
                 try:
                     # Load simulation results
@@ -84,28 +102,46 @@ def load_cached_results():
                     if os.path.exists(yearly_filename):
                         cached_yearly_data[f"{program_type}_{percentile}"] = pd.read_parquet(yearly_filename).to_dict('records')
                         print(f"Loaded cached yearly data for {program_type} {percentile}")
+                    
+                    # Load earnings by degree data (pickle format for nested structures)
+                    if os.path.exists(earnings_by_degree_filename):
+                        with open(earnings_by_degree_filename, 'rb') as f:
+                            cached_earnings_by_degree[f"{program_type}_{percentile}"] = pickle.load(f)
+                        print(f"Loaded cached earnings by degree data for {program_type} {percentile}")
                 except Exception as e:
                     print(f"Error loading cache for {program_type} {percentile}: {e}")
     except Exception as e:
         print(f"Error initializing cache: {e}")
 
 # Function to save results to cache
-def save_to_cache(program_type, percentile, results, yearly_data):
+def save_to_cache(program_type, percentile, results, yearly_data, earnings_by_degree_yearly=None):
+    global cached_earnings_by_degree
     try:
         if not os.path.exists(CACHE_DIR):
             os.makedirs(CACHE_DIR)
         
         results_filename = get_cache_filename(program_type, percentile)
         yearly_filename = get_yearly_data_filename(program_type, percentile)
+        earnings_by_degree_filename = get_earnings_by_degree_filename(program_type, percentile)
+        
+        # Create a copy of results without earnings_by_degree_yearly for parquet serialization
+        results_for_cache = {k: v for k, v in results.items() if k != 'earnings_by_degree_yearly'}
         
         # Save simulation results (convert to DataFrame first)
-        results_df = pd.DataFrame([results])
+        results_df = pd.DataFrame([results_for_cache])
         results_df.to_parquet(results_filename, index=False)
         cached_results[f"{program_type}_{percentile}"] = results
         
         # Save yearly data (already in list of dicts format)
         pd.DataFrame(yearly_data).to_parquet(yearly_filename, index=False)
         cached_yearly_data[f"{program_type}_{percentile}"] = yearly_data
+        
+        # Save earnings by degree data (pickle format for nested structures)
+        if earnings_by_degree_yearly:
+            with open(earnings_by_degree_filename, 'wb') as f:
+                pickle.dump(earnings_by_degree_yearly, f)
+            cached_earnings_by_degree[f"{program_type}_{percentile}"] = earnings_by_degree_yearly
+            print(f"Saved earnings by degree data to cache for {program_type} {percentile}")
         
         print(f"Saved results and yearly data to cache for {program_type} {percentile}")
     except Exception as e:
@@ -132,32 +168,32 @@ def create_degree_params(percentile, program_type):
                     salary_std=6000,
                     annual_growth=0.03,
                     years_to_complete=4,
-                    home_prob=0.1
-                ), 0.20),
+                    home_prob=0
+                ), 0.18),
                 (DegreeParams(
                     name='MA',
                     initial_salary=46709,
                     salary_std=6600,
                     annual_growth=0.04,
                     years_to_complete=6,
-                    home_prob=0.1
-                ), 0.10),
+                    home_prob=0
+                ), 0.09),
                 (DegreeParams(
                     name='ASST_SHIFT',
                     initial_salary=31500,
                     salary_std=2800,
                     annual_growth=0.005,
                     years_to_complete=6,
-                    home_prob=0.1
-                ), 0.35),
+                    home_prob=0
+                ), 0.315),
                 (DegreeParams(
                     name='NA',
-                    initial_salary=1100,
+                    initial_salary=4000,
                     salary_std=640,
                     annual_growth=0.01,
                     years_to_complete=2,
                     home_prob=1.0
-                ), 0.35)
+                ), 0.415)
             ]
         elif percentile == 'p25':
             return [
@@ -167,32 +203,32 @@ def create_degree_params(percentile, program_type):
                     salary_std=6000,
                     annual_growth=0.03,
                     years_to_complete=4,
-                    home_prob=0.1
-                ), 0.35),
+                    home_prob=0
+                ), 0.315),
                 (DegreeParams(
                     name='MA',
                     initial_salary=46709,
                     salary_std=6600,
                     annual_growth=0.04,
                     years_to_complete=6,
-                    home_prob=0.1
-                ), 0.15),
+                    home_prob=0
+                ), 0.135),
                 (DegreeParams(
                     name='ASST_SHIFT',
                     initial_salary=31500,
                     salary_std=2800,
                     annual_growth=0.005,
                     years_to_complete=6,
-                    home_prob=0.1
-                ), 0.35),
+                    home_prob=0
+                ), 0.315),
                 (DegreeParams(
                     name='NA',
-                    initial_salary=1100,
+                    initial_salary=4000,
                     salary_std=100,
                     annual_growth=0.01,
                     years_to_complete=2,
                     home_prob=1.0
-                ), 0.15)
+                ), 0.235)
             ]
         elif percentile == 'p50':
             return [
@@ -202,32 +238,32 @@ def create_degree_params(percentile, program_type):
                     salary_std=6000,
                     annual_growth=0.03,
                     years_to_complete=4,
-                    home_prob=0.1
-                ), 0.45),
+                    home_prob=0
+                ), 0.405),
                 (DegreeParams(
                     name='MA',
                     initial_salary=46709,
                     salary_std=6600,
                     annual_growth=0.04,
                     years_to_complete=6,
-                    home_prob=0.1
-                ), 0.24),
+                    home_prob=0
+                ), 0.216),
                 (DegreeParams(
                     name='ASST_SHIFT',
                     initial_salary=31500,
                     salary_std=2800,
                     annual_growth=0.005,
                     years_to_complete=6,
-                    home_prob=0.1
-                ), 0.27),
+                    home_prob=0
+                ), 0.243),
                 (DegreeParams(
                     name='NA',
-                    initial_salary=1100,
+                    initial_salary=4000,
                     salary_std=100,
                     annual_growth=0.01,
                     years_to_complete=2,
                     home_prob=1.0
-                ), 0.04)
+                ), 0.136)
             ]
         elif percentile == 'p75':
             return [
@@ -237,32 +273,32 @@ def create_degree_params(percentile, program_type):
                     salary_std=6000,
                     annual_growth=0.03,
                     years_to_complete=4,
-                    home_prob=0.1
-                ), 0.50),
+                    home_prob=0
+                ), 0.45),
                 (DegreeParams(
                     name='MA',
                     initial_salary=46709,
                     salary_std=6600,
                     annual_growth=0.04,
                     years_to_complete=6,
-                    home_prob=0.1
-                ), 0.30),
+                    home_prob=0
+                ), 0.27),
                 (DegreeParams(
                     name='ASST_SHIFT',
                     initial_salary=31500,
                     salary_std=2800,
                     annual_growth=0.005,
                     years_to_complete=6,
-                    home_prob=0.1
-                ), 0.18),
+                    home_prob=0
+                ), 0.162),
                 (DegreeParams(
                     name='NA',
-                    initial_salary=1100,
+                    initial_salary=4000,
                     salary_std=100,
                     annual_growth=0.01,
                     years_to_complete=2,
                     home_prob=1.0
-                ), 0.02)
+                ), 0.118)
             ]
         elif percentile == 'p90':
             return [
@@ -272,32 +308,32 @@ def create_degree_params(percentile, program_type):
                     salary_std=6000,
                     annual_growth=0.03,
                     years_to_complete=4,
-                    home_prob=0.1
-                ), 0.60),
+                    home_prob=0
+                ), 0.54),
                 (DegreeParams(
                     name='MA',
                     initial_salary=46709,
                     salary_std=6600,
                     annual_growth=0.04,
                     years_to_complete=6,
-                    home_prob=0.1
-                ), 0.39),
+                    home_prob=0
+                ), 0.351),
                 (DegreeParams(
                     name='ASST_SHIFT',
                     initial_salary=31500,
                     salary_std=2800,
                     annual_growth=0.005,
                     years_to_complete=6,
-                    home_prob=0.1
-                ), 0.01),
+                    home_prob=0
+                ), 0.009),
                 (DegreeParams(
                     name='NA',
-                    initial_salary=1100,
+                    initial_salary=4000,
                     salary_std=100,
                     annual_growth=0.01,
                     years_to_complete=2,
                     home_prob=1.0
-                ), 0.00)
+                ), 0.10)
             ]
     
     elif program_type == 'Nurse':  # Kenya program
@@ -309,32 +345,32 @@ def create_degree_params(percentile, program_type):
                     salary_std=4000,
                     annual_growth=0.02,
                     years_to_complete=4,
-                    home_prob=0.1
-                ), 0.12),
+                    home_prob=0
+                ), 0.108),
                 (DegreeParams(
                     name='ASST',
                     initial_salary=31500,
                     salary_std=2800,
                     annual_growth=0.005,
                     years_to_complete=3,
-                    home_prob=0.1
-                ), 0.13),
+                    home_prob=0
+                ), 0.117),
                 (DegreeParams(
                     name='ASST_SHIFT',
                     initial_salary=31500,
                     salary_std=2800,
                     annual_growth=0.005,
                     years_to_complete=6,
-                    home_prob=0.1
-                ), 0.20),
+                    home_prob=0
+                ), 0.18),
                 (DegreeParams(
                     name='NA',
-                    initial_salary=1100,
+                    initial_salary=4000,
                     salary_std=100,
                     annual_growth=0.01,
                     years_to_complete=2,
                     home_prob=1.0
-                ), 0.55)
+                ), 0.595)
             ]
         elif percentile == 'p25':
             return [
@@ -344,32 +380,32 @@ def create_degree_params(percentile, program_type):
                     salary_std=4000,
                     annual_growth=0.02,
                     years_to_complete=4,
-                    home_prob=0.1
-                ), 0.20),
+                    home_prob=0
+                ), 0.18),
                 (DegreeParams(
                     name='ASST',
                     initial_salary=31500,
                     salary_std=2800,
                     annual_growth=0.005,
                     years_to_complete=3,
-                    home_prob=0.1
-                ), 0.35),
+                    home_prob=0
+                ), 0.315),
                 (DegreeParams(
                     name='ASST_SHIFT',
                     initial_salary=31500,
                     salary_std=2800,
                     annual_growth=0.005,
                     years_to_complete=6,
-                    home_prob=0.1
-                ), 0.25),
+                    home_prob=0
+                ), 0.225),
                 (DegreeParams(
                     name='NA',
-                    initial_salary=1100,
+                    initial_salary=4000,
                     salary_std=100,
                     annual_growth=0.01,
                     years_to_complete=2,
                     home_prob=1.0
-                ), 0.20)
+                ), 0.28)
             ]
         elif percentile == 'p50':
             return [
@@ -379,32 +415,32 @@ def create_degree_params(percentile, program_type):
                     salary_std=4000,
                     annual_growth=0.02,
                     years_to_complete=4,
-                    home_prob=0.1
-                ), 0.30),
+                    home_prob=0
+                ), 0.27),
                 (DegreeParams(
                     name='ASST',
                     initial_salary=31500,
                     salary_std=2800,
                     annual_growth=0.005,
                     years_to_complete=3,
-                    home_prob=0.1
-                ), 0.40),
+                    home_prob=0
+                ), 0.36),
                 (DegreeParams(
                     name='ASST_SHIFT',
                     initial_salary=31500,
                     salary_std=2800,
                     annual_growth=0.005,
                     years_to_complete=6,
-                    home_prob=0.1
-                ), 0.20),
+                    home_prob=0
+                ), 0.18),
                 (DegreeParams(
                     name='NA',
-                    initial_salary=1100,
+                    initial_salary=4000,
                     salary_std=100,
                     annual_growth=0.01,
                     years_to_complete=2,
                     home_prob=1.0
-                ), 0.10)
+                ), 0.19)
             ]
         elif percentile == 'p75':
             return [
@@ -414,32 +450,32 @@ def create_degree_params(percentile, program_type):
                     salary_std=4000,
                     annual_growth=0.02,
                     years_to_complete=4,
-                    home_prob=0.1
-                ), 0.45),
+                    home_prob=0
+                ), 0.405),
                 (DegreeParams(
                     name='ASST',
                     initial_salary=31500,
                     salary_std=2800,
                     annual_growth=0.005,
                     years_to_complete=3,
-                    home_prob=0.1
-                ), 0.40),
+                    home_prob=0
+                ), 0.36),
                 (DegreeParams(
                     name='ASST_SHIFT',
                     initial_salary=31500,
                     salary_std=2800,
                     annual_growth=0.005,
                     years_to_complete=6,
-                    home_prob=0.1
-                ), 0.10),
+                    home_prob=0
+                ), 0.09),
                 (DegreeParams(
                     name='NA',
-                    initial_salary=1100,
+                    initial_salary=4000,
                     salary_std=100,
                     annual_growth=0.01,
                     years_to_complete=2,
                     home_prob=1.0
-                ), 0.05)
+                ), 0.145)
             ]
         elif percentile == 'p90':
             return [
@@ -449,32 +485,32 @@ def create_degree_params(percentile, program_type):
                     salary_std=4000,
                     annual_growth=0.02,
                     years_to_complete=4,
-                    home_prob=0.1
-                ), 0.60),
+                    home_prob=0
+                ), 0.54),
                 (DegreeParams(
                     name='ASST',
                     initial_salary=31500,
                     salary_std=2800,
                     annual_growth=0.005,
                     years_to_complete=3,
-                    home_prob=0.1
-                ), 0.35),
+                    home_prob=0
+                ), 0.315),
                 (DegreeParams(
                     name='ASST_SHIFT',
                     initial_salary=31500,
                     salary_std=2800,
                     annual_growth=0.005,
                     years_to_complete=6,
-                    home_prob=0.1
-                ), 0.05),
+                    home_prob=0
+                ), 0.045),
                 (DegreeParams(
                     name='NA',
-                    initial_salary=1100,
+                    initial_salary=4000,
                     salary_std=100,
                     annual_growth=0.01,
                     years_to_complete=2,
                     home_prob=1.0
-                ), 0.00)
+                ), 0.10)
             ]
     
     else:  # Trade program
@@ -486,32 +522,32 @@ def create_degree_params(percentile, program_type):
                     salary_std=3000,
                     annual_growth=0.02,
                     years_to_complete=3,
-                    home_prob=0.1
-                ), 0.17),
+                    home_prob=0
+                ), 0.153),
                 (DegreeParams(
                     name='ASST',
                     initial_salary=31500,
                     salary_std=2800,
                     annual_growth=0.005,
                     years_to_complete=3,
-                    home_prob=0.1
-                ), 0.13),
+                    home_prob=0
+                ), 0.117),
                 (DegreeParams(
                     name='ASST_SHIFT',
                     initial_salary=31500,
                     salary_std=2800,
                     annual_growth=0.005,
                     years_to_complete=6,
-                    home_prob=0.1
-                ), 0.15),
+                    home_prob=0
+                ), 0.135),
                 (DegreeParams(
                     name='NA',
-                    initial_salary=1100,
+                    initial_salary=4000,
                     salary_std=100,
                     annual_growth=0.01,
                     years_to_complete=2,
                     home_prob=1.0
-                ), 0.55)
+                ), 0.595)
             ]
         elif percentile == 'p25':
             return [
@@ -521,32 +557,32 @@ def create_degree_params(percentile, program_type):
                     salary_std=3000,
                     annual_growth=0.02,
                     years_to_complete=3,
-                    home_prob=0.1
-                ), 0.30),
+                    home_prob=0
+                ), 0.27),
                 (DegreeParams(
                     name='ASST',
                     initial_salary=31500,
                     salary_std=2800,
                     annual_growth=0.005,
                     years_to_complete=3,
-                    home_prob=0.1
-                ), 0.20),
+                    home_prob=0
+                ), 0.18),
                 (DegreeParams(
                     name='ASST_SHIFT',
                     initial_salary=31500,
                     salary_std=2800,
                     annual_growth=0.005,
                     years_to_complete=6,
-                    home_prob=0.1
-                ), 0.20),
+                    home_prob=0
+                ), 0.18),
                 (DegreeParams(
                     name='NA',
-                    initial_salary=1100,
+                    initial_salary=4000,
                     salary_std=100,
                     annual_growth=0.01,
                     years_to_complete=2,
                     home_prob=1.0
-                ), 0.30)
+                ), 0.37)
             ]
         elif percentile == 'p50':
             return [
@@ -556,32 +592,32 @@ def create_degree_params(percentile, program_type):
                     salary_std=3000,
                     annual_growth=0.02,
                     years_to_complete=3,
-                    home_prob=0.1
-                ), 0.40),
+                    home_prob=0
+                ), 0.36),
                 (DegreeParams(
                     name='ASST',
                     initial_salary=31500,
                     salary_std=2800,
                     annual_growth=0.005,
                     years_to_complete=3,
-                    home_prob=0.1
-                ), 0.30),
+                    home_prob=0
+                ), 0.27),
                 (DegreeParams(
                     name='ASST_SHIFT',
                     initial_salary=31500,
                     salary_std=2800,
                     annual_growth=0.005,
                     years_to_complete=6,
-                    home_prob=0.1
-                ), 0.15),
+                    home_prob=0
+                ), 0.135),
                 (DegreeParams(
                     name='NA',
-                    initial_salary=1100,
+                    initial_salary=4000,
                     salary_std=100,
                     annual_growth=0.01,
                     years_to_complete=2,
                     home_prob=1.0
-                ), 0.15)
+                ), 0.235)
             ]
         elif percentile == 'p75':
             return [
@@ -591,32 +627,32 @@ def create_degree_params(percentile, program_type):
                     salary_std=3000,
                     annual_growth=0.02,
                     years_to_complete=3,
-                    home_prob=0.1
-                ), 0.50),
+                    home_prob=0
+                ), 0.45),
                 (DegreeParams(
                     name='ASST',
                     initial_salary=31500,
                     salary_std=2800,
                     annual_growth=0.005,
                     years_to_complete=3,
-                    home_prob=0.1
-                ), 0.35),
+                    home_prob=0
+                ), 0.315),
                 (DegreeParams(
                     name='ASST_SHIFT',
                     initial_salary=31500,
                     salary_std=2800,
                     annual_growth=0.005,
                     years_to_complete=6,
-                    home_prob=0.1
-                ), 0.10),
+                    home_prob=0
+                ), 0.09),
                 (DegreeParams(
                     name='NA',
-                    initial_salary=1100,
+                    initial_salary=4000,
                     salary_std=100,
                     annual_growth=0.01,
                     years_to_complete=2,
                     home_prob=1.0
-                ), 0.05)
+                ), 0.145)
             ]
         elif percentile == 'p90':
             return [
@@ -626,32 +662,32 @@ def create_degree_params(percentile, program_type):
                     salary_std=3000,
                     annual_growth=0.02,
                     years_to_complete=3,
-                    home_prob=0.1
-                ), 0.60),
+                    home_prob=0
+                ), 0.54),
                 (DegreeParams(
                     name='ASST',
                     initial_salary=31500,
                     salary_std=2800,
                     annual_growth=0.005,
                     years_to_complete=3,
-                    home_prob=0.1
-                ), 0.35),
+                    home_prob=0
+                ), 0.315),
                 (DegreeParams(
                     name='ASST_SHIFT',
                     initial_salary=31500,
                     salary_std=2800,
                     annual_growth=0.005,
                     years_to_complete=6,
-                    home_prob=0.1
-                ), 0.05),
+                    home_prob=0
+                ), 0.045),
                 (DegreeParams(
                     name='NA',
-                    initial_salary=1100,
+                    initial_salary=4000,
                     salary_std=100,
                     annual_growth=0.01,
                     years_to_complete=2,
                     home_prob=1.0
-                ), 0.00)
+                ), 0.10)
             ]
     
     return None  # Should never reach here
@@ -709,20 +745,21 @@ def precompute_percentile_scenarios():
             results = simulate_impact(
                 program_type=program_type,
                 initial_investment=1000000,  
-                num_years=45,
+                num_years=55,
                 impact_params=impact_params,
                 num_sims=1,
                 scenario='baseline',
                 remittance_rate=0.08,
-                home_prob=0.1,  # Fixed at 10%
+                home_prob=0,  # Set to 0; return-home probability is now in NA outcomes
                 degree_params=degree_params,
                 initial_unemployment_rate=0.08,  # Fixed at 8%
                 initial_inflation_rate=0.02,  # Fixed at 2%
                 data_callback=data_callback
             )
             
-            # Cache the results
-            save_to_cache(program_type, percentile, results, yearly_data)
+            # Cache the results (including earnings_by_degree_yearly)
+            earnings_by_degree_yearly = results.get('earnings_by_degree_yearly', [])
+            save_to_cache(program_type, percentile, results, yearly_data, earnings_by_degree_yearly)
             
     print("Precomputation complete!")
 
@@ -780,7 +817,7 @@ def create_custom_degree_params(program_type, ba_weight=None, ma_weight=None, as
                 salary_std=6000,
                 annual_growth=0.03,
                 years_to_complete=4,
-                home_prob=0.1
+                home_prob=0
             ), ba_pct),
             (DegreeParams(
                 name='MA',
@@ -788,7 +825,7 @@ def create_custom_degree_params(program_type, ba_weight=None, ma_weight=None, as
                 salary_std=6600,
                 annual_growth=0.04,
                 years_to_complete=6,
-                home_prob=0.1
+                home_prob=0
             ), ma_pct),
             (DegreeParams(
                 name='ASST_SHIFT',
@@ -796,11 +833,11 @@ def create_custom_degree_params(program_type, ba_weight=None, ma_weight=None, as
                 salary_std=2800,
                 annual_growth=0.005,
                 years_to_complete=6,
-                home_prob=0.1
+                home_prob=0
             ), asst_shift_pct),
             (DegreeParams(
                 name='NA',
-                initial_salary=1100,
+                initial_salary=4000,
                 salary_std=100,
                 annual_growth=0.01,
                 years_to_complete=2,
@@ -834,7 +871,7 @@ def create_custom_degree_params(program_type, ba_weight=None, ma_weight=None, as
                 salary_std=4000,
                 annual_growth=0.02,
                 years_to_complete=4,
-                home_prob=0.1
+                home_prob=0
             ), nurse_pct),
             (DegreeParams(
                 name='ASST',
@@ -842,7 +879,7 @@ def create_custom_degree_params(program_type, ba_weight=None, ma_weight=None, as
                 salary_std=2800,
                 annual_growth=0.005,
                 years_to_complete=3,
-                home_prob=0.1
+                home_prob=0
             ), asst_pct),
             (DegreeParams(
                 name='ASST_SHIFT',
@@ -850,11 +887,11 @@ def create_custom_degree_params(program_type, ba_weight=None, ma_weight=None, as
                 salary_std=2800,
                 annual_growth=0.005,
                 years_to_complete=6,
-                home_prob=0.1
+                home_prob=0
             ), asst_shift_pct),
             (DegreeParams(
                 name='NA',
-                initial_salary=1100,
+                initial_salary=4000,
                 salary_std=100,
                 annual_growth=0.01,
                 years_to_complete=2,
@@ -888,7 +925,7 @@ def create_custom_degree_params(program_type, ba_weight=None, ma_weight=None, as
                 salary_std=3000,
                 annual_growth=0.02,
                 years_to_complete=3,
-                home_prob=0.1
+                home_prob=0
             ), trade_pct),
             (DegreeParams(
                 name='ASST',
@@ -896,7 +933,7 @@ def create_custom_degree_params(program_type, ba_weight=None, ma_weight=None, as
                 salary_std=2800,
                 annual_growth=0.005,
                 years_to_complete=3,
-                home_prob=0.1
+                home_prob=0
             ), asst_pct),
             (DegreeParams(
                 name='ASST_SHIFT',
@@ -904,11 +941,11 @@ def create_custom_degree_params(program_type, ba_weight=None, ma_weight=None, as
                 salary_std=2800,
                 annual_growth=0.005,
                 years_to_complete=6,
-                home_prob=0.1
+                home_prob=0
             ), asst_shift_pct),
             (DegreeParams(
                 name='NA',
-                initial_salary=1100,
+                initial_salary=4000,
                 salary_std=100,
                 annual_growth=0.01,
                 years_to_complete=2,
@@ -1056,16 +1093,16 @@ dashboard_layout = html.Div([
                                 ], style={'padding': '10px', 'backgroundColor': '#f9f9f9', 'borderRadius': '5px', 'marginBottom': '15px'}),
                                 dcc.Graph(id='impact-metrics-graph')
                             ]),
-                            dcc.Tab(label='Impact Metrics', children=[
+                            dcc.Tab(label='Earnings by Degree', children=[
                                 html.Div([
-                                    html.H4("Understanding Impact Metrics"),
+                                    html.H4("Earnings Breakdown by Degree Type"),
                                     html.P([
-                                        "This graph shows the total earnings gain  generated across different percentile scenarios. ",
-                                        "It represents the direct financial impact of the program on students' lifetime earnings. ",
-                                        "This metric helps assess the economic return on investment from the program."
+                                        "This table shows the yearly breakdown of average earnings, counterfactual earnings, and remittances by degree type. ",
+                                        "Use this to verify that stipend income, study income, counterfactual earnings, and remittances are being correctly calculated. ",
+                                        "The table also shows the count of students and their status (graduated, in Germany, at home)."
                                     ])
                                 ], style={'padding': '10px', 'backgroundColor': '#f9f9f9', 'borderRadius': '5px', 'marginBottom': '15px'}),
-                                dcc.Graph(id='impact-graph')
+                                html.Div(id='earnings-by-degree-table')
                             ]),
                             dcc.Tab(label='Yearly Cash Flow', children=[
                                 html.Div([
@@ -1489,7 +1526,7 @@ def update_calculated_students(program_type):
     
     # Get price per student based on program type
     if program_type == 'University':
-        price_per_student = 29000
+        price_per_student = 30012  # GiveWell analysis cost per student
         program_name = 'Uganda'
     elif program_type == 'Nurse':
         price_per_student = 16650
@@ -1697,7 +1734,7 @@ def toggle_custom_weights(mode):
     [Output('simulation-results', 'children'),
      Output('percentile-tables', 'children'),
      Output('impact-metrics-graph', 'figure'),
-     Output('impact-graph', 'figure'),
+     Output('earnings-by-degree-table', 'children'),
      Output('yearly-cash-flow-table', 'children'),
      Output('loading-simulation', 'parent_className'),
      Output('isa-vs-givedirectly-chart', 'figure'),
@@ -1768,7 +1805,7 @@ def update_results(n_clicks, program_type, initial_investment,
     
     if price_per_student is None:
         if program_type == 'University':  # Uganda program
-            price_per_student = 29000
+            price_per_student = 30012  # GiveWell analysis cost per student
         elif program_type == 'Nurse':     # Kenya program
             price_per_student = 16650
         elif program_type == 'Trade':     # Rwanda program
@@ -1811,14 +1848,14 @@ def update_results(n_clicks, program_type, initial_investment,
         if simulation_mode == 'percentile' and percentile != 'Custom':
             cache_key = f"{program_type}_{percentile}"
             if cache_key in cached_results:
-                all_results[percentile] = cached_results[cache_key]
+                all_results[percentile] = cached_results[cache_key].copy()
                 
                 # Use cached yearly data if available
                 if cache_key in cached_yearly_data:
                     yearly_data_by_percentile[percentile] = cached_yearly_data[cache_key]
                 else:
                     # Generate yearly data based on cached results
-                    for i in range(45):  # Assume 45 years
+                    for i in range(55):  # Assume 55 years
                         yearly_data.append({
                             'year': i,
                             'cash': all_results[percentile].get('yearly_cash', [])[i] if i < len(all_results[percentile].get('yearly_cash', [])) else 0,
@@ -1829,6 +1866,10 @@ def update_results(n_clicks, program_type, initial_investment,
                         })
                     
                     yearly_data_by_percentile[percentile] = yearly_data
+                
+                # Use cached earnings by degree data if available
+                if cache_key in cached_earnings_by_degree:
+                    all_results[percentile]['earnings_by_degree_yearly'] = cached_earnings_by_degree[cache_key]
                 
                 use_cached = True
                 print(f"Using cached results for {program_type} {percentile}")
@@ -1852,7 +1893,7 @@ def update_results(n_clicks, program_type, initial_investment,
         results = simulate_impact(
             program_type=program_type,
             initial_investment=initial_investment,
-            num_years=45,
+            num_years=55,
             impact_params=impact_params,
             num_sims=1,
             scenario='baseline',
@@ -1870,7 +1911,8 @@ def update_results(n_clicks, program_type, initial_investment,
         
         # Cache percentile results for future use
         if simulation_mode == 'percentile' and percentile != 'Custom':
-            save_to_cache(program_type, percentile, results, yearly_data)
+            earnings_by_degree_yearly = results.get('earnings_by_degree_yearly', [])
+            save_to_cache(program_type, percentile, results, yearly_data, earnings_by_degree_yearly)
     
     # Save results to CSV for visualization
     save_percentile_results_to_csv(all_results, percentiles)
@@ -1904,7 +1946,7 @@ def update_results(n_clicks, program_type, initial_investment,
             html.H4("Simulation Information"),
             html.P(f"Program Type: {program_type}"),
             html.P(f"Initial Investment: ${initial_investment:,}"),
-            html.P(f"Simulation Length: 45 years")
+            html.P(f"Simulation Length: 55 years")
         ], style={'marginTop': '20px'})
     ])
     
@@ -2209,46 +2251,86 @@ def update_results(n_clicks, program_type, initial_investment,
         )
     )
     
-    # Create impact graph
-    euros_fig = go.Figure()
-    
+    # Create earnings by degree table
+    # Get earnings by degree data from simulation results
     if simulation_mode == 'percentile':
-        for percentile in percentiles:
-            results = all_results[percentile]
-            
-            # Calculate total earnings gain
-            total_earnings_gain = results['student_metrics']['avg_earnings_gain'] * results['students_educated']
-            
-            euros_fig.add_trace(go.Bar(
-                x=[percentile],
-                y=[total_earnings_gain],
-                name="Total Earnings Gain",
-                marker_color='#4CAF50'
-            ))
+        # Use P50 scenario for the table
+        results_for_earnings = all_results['p50']
     else:
-        results = all_results['Custom']
-        
-        # Calculate total earnings gain
-        total_earnings_gain = results['student_metrics']['avg_earnings_gain'] * results['students_educated']
-        
-        euros_fig.add_trace(go.Bar(
-            x=['Custom Scenario'],
-            y=[total_earnings_gain],
-            name="Total Earnings Gain",
-            marker_color='#4CAF50'
-        ))
+        results_for_earnings = all_results['Custom']
     
-    euros_fig.update_layout(
-        title="Total Earnings Gain",
-        yaxis_title="Total Earnings Gain",
-        legend=dict(
-            orientation="h",
-            yanchor="bottom",
-            y=1.02,
-            xanchor="right",
-            x=1
-        )
-    )
+    earnings_by_degree_yearly = results_for_earnings.get('earnings_by_degree_yearly', [])
+    
+    # Build the earnings by degree table
+    earnings_by_degree_rows = []
+    
+    if earnings_by_degree_yearly:
+        # Get all degree types from the data
+        all_degree_types = set()
+        for year_data in earnings_by_degree_yearly:
+            all_degree_types.update(year_data.get('by_degree', {}).keys())
+        all_degree_types = sorted(list(all_degree_types))
+        
+        for year_data in earnings_by_degree_yearly:
+            year = year_data['year']
+            by_degree = year_data.get('by_degree', {})
+            
+            for degree_type in all_degree_types:
+                if degree_type in by_degree:
+                    deg_data = by_degree[degree_type]
+                    earnings_by_degree_rows.append({
+                        'Year': year,
+                        'Degree Type': degree_type,
+                        'Count': deg_data.get('count', 0),
+                        'Avg Earnings ($)': f"${deg_data.get('avg_earnings', 0):,.2f}",
+                        'Avg Counterfactual ($)': f"${deg_data.get('avg_counterfactual', 0):,.2f}",
+                        'Avg Remittances ($)': f"${deg_data.get('avg_remittances', 0):,.2f}",
+                        'Graduated': deg_data.get('graduated_count', 0),
+                        'In Germany': deg_data.get('in_germany_count', 0),
+                        'At Home': deg_data.get('at_home_count', 0)
+                    })
+    
+    if earnings_by_degree_rows:
+        earnings_df = pd.DataFrame(earnings_by_degree_rows)
+        earnings_by_degree_table = html.Div([
+            html.H4("Yearly Earnings Breakdown by Degree Type"),
+            html.P([
+                "This table shows the detailed breakdown of earnings by degree type for each year. ",
+                "EUR earnings are converted to USD (at 0.8458 rate) for comparison with USD counterfactual. ",
+                "Remittances are also shown in USD. ",
+                f"Showing data for {'P50' if simulation_mode == 'percentile' else 'Custom'} scenario."
+            ], style={'fontSize': '14px', 'marginBottom': '15px', 'fontStyle': 'italic'}),
+            dash_table.DataTable(
+                id='earnings-degree-detail-table',
+                columns=[{"name": i, "id": i} for i in earnings_df.columns],
+                data=earnings_df.to_dict('records'),
+                style_cell={'textAlign': 'center', 'fontSize': '12px', 'padding': '5px'},
+                style_header={
+                    'backgroundColor': 'rgb(230, 230, 230)',
+                    'fontWeight': 'bold'
+                },
+                filter_action="native",
+                sort_action="native",
+                page_size=20,
+                style_table={'overflowX': 'auto'},
+                style_data_conditional=[
+                    {
+                        'if': {'filter_query': '{Degree Type} = "NA"'},
+                        'backgroundColor': 'rgba(255, 200, 200, 0.3)',
+                    },
+                    {
+                        'if': {'filter_query': '{Graduated} > 0'},
+                        'backgroundColor': 'rgba(200, 255, 200, 0.3)',
+                    }
+                ]
+            )
+        ])
+    else:
+        earnings_by_degree_table = html.Div([
+            html.H4("Earnings Breakdown by Degree Type"),
+            html.P("No earnings data available. This may be because the simulation used cached results. Try running a new simulation.", 
+                   style={'fontStyle': 'italic', 'color': '#666'})
+        ])
     
     # Create ISA vs GiveDirectly comparison chart
     # Define GiveDirectly country data
@@ -2375,15 +2457,19 @@ def update_results(n_clicks, program_type, initial_investment,
         givedirectly_npv_ppp[country] = total_impact
     
     # Calculate ISA program NPV PPP adjusted values
+    # Note: avg_remittance_gain and avg_earnings_gain are now in USD (EUR earnings converted to USD)
+    # This ensures proper comparison with USD-denominated counterfactual and GiveDirectly metrics
     isa_npv_ppp_data = []
     for percentile in percentiles:
         results = all_results[percentile]
         
-        # Calculate remittance benefits (PPP adjusted by 2.5)
+        # Calculate remittance benefits (PPP adjusted by 2.542 - Uganda PPP multiplier)
+        # Remittances are in USD (converted from EUR at 0.8458 rate)
         total_remittance_gain = results['student_metrics']['avg_remittance_gain'] * results['students_educated']
-        remittance_npv_ppp = total_remittance_gain * 2.542
+        remittance_npv_ppp = total_remittance_gain * 2.542  # Apply PPP to convert to home country purchasing power
         
         # Calculate personal consumption benefits (earnings gain minus remittances)
+        # All values now in USD for consistent comparison
         total_earnings_gain = results['student_metrics']['avg_earnings_gain'] * results['students_educated']
         personal_consumption = total_earnings_gain - total_remittance_gain
         
@@ -2459,7 +2545,8 @@ def update_results(n_clicks, program_type, initial_investment,
         html.H4("Malengo ISA Program NPV PPP Adjusted Impact", style={'marginTop': '30px'}),
         html.P([
             f"This table shows the {program_type} ISA program benefits split into personal consumption ",
-            "and remittance benefits (PPP adjusted)."
+            "and remittance benefits. EUR earnings are converted to USD (at 0.8458 rate) before comparison ",
+            "with USD counterfactual. Remittance benefits are PPP-adjusted (2.542x) for home country purchasing power."
         ], style={'fontSize': '14px', 'marginBottom': '15px', 'fontStyle': 'italic'}),
         dash_table.DataTable(
             id='malengo-table',
@@ -2565,7 +2652,7 @@ def update_results(n_clicks, program_type, initial_investment,
         )
     )
     
-    return summary_table, tables_div, impact_fig, euros_fig, cash_flow_table, 'loading-simulation', isa_vs_givedirectly_fig, npv_ppp_table, npv_ppp_fig
+    return summary_table, tables_div, impact_fig, earnings_by_degree_table, cash_flow_table, 'loading-simulation', isa_vs_givedirectly_fig, npv_ppp_table, npv_ppp_fig
 
 # Run the app
 if __name__ == '__main__':
