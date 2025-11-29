@@ -1178,6 +1178,10 @@ def simulate_impact(
     # Mark any remaining active contracts as defaulted
     pool.mark_remaining_as_defaulted()
     
+    # Project all students' earnings to their full lifetime
+    # This ensures students enrolled later still get their full ~60 years captured
+    project_remaining_lifetime(students, year, impact_params, num_years)
+    
     # Calculate final metrics
     final_irr = pool.calculate_irr()
     total_students_educated = len([s for s in students if s.is_graduated])
@@ -1576,6 +1580,130 @@ def aggregate_simulation_results(results: List[Dict]) -> Dict:
         'time_series': time_series,
         'student_outcomes': student_outcomes
     }
+
+def project_remaining_lifetime(students: List, year: 'Year', impact_params: ImpactParams, 
+                                simulation_end_year: int) -> None:
+    """
+    Project earnings for all students to their full lifetime after simulation ends.
+    
+    This ensures students enrolled later in the simulation still get their full
+    ~60 years of earnings/consumption captured, not truncated at simulation end.
+    
+    For example, if the simulation runs for 55 years:
+    - A student enrolled in year 0 with 55 years of data needs ~5 more years to reach
+      their full working lifetime (age 22 + 55 = 77, but life expectancy is 81.4)
+    - A student enrolled in year 40 with only 15 years of data needs ~44 more years
+      to capture their full lifetime impact
+    
+    Args:
+        students: List of Student objects to project
+        year: Year object with current economic parameters (inflation rate, deflator)
+        impact_params: Impact parameters including counterfactual params
+        simulation_end_year: The last year of the simulation (typically num_years)
+    """
+    for student in students:
+        # Calculate how many years of data we have vs how many we need
+        current_data_years = len(student.earnings)
+        
+        # Calculate the student's age at the end of their data
+        age_at_data_end = student.starting_age + current_data_years
+        
+        # How many more years until life expectancy?
+        remaining_years = int(student.life_expectancy - age_at_data_end)
+        
+        if remaining_years <= 0:
+            continue  # Already have full lifetime coverage
+        
+        # Extend arrays
+        extended_earnings = np.zeros(current_data_years + remaining_years)
+        extended_counterfactual = np.zeros(current_data_years + remaining_years)
+        extended_payments = np.zeros(current_data_years + remaining_years)
+        extended_real_payments = np.zeros(current_data_years + remaining_years)
+        extended_employment = np.zeros(current_data_years + remaining_years, dtype=bool)
+        
+        # Copy existing data
+        extended_earnings[:current_data_years] = student.earnings
+        extended_counterfactual[:current_data_years] = student.counterfactual_earnings
+        extended_payments[:current_data_years] = student.payments
+        extended_real_payments[:current_data_years] = student.real_payments
+        extended_employment[:current_data_years] = student.employment_history
+        
+        # Get last known deflator and project forward
+        last_deflator = year.deflator
+        inflation_rate = year.stable_inflation_rate
+        
+        # Project counterfactual parameters
+        cf_params = impact_params.counterfactual
+        control_income = cf_params.base_earnings * cf_params.control_earner_multiplier
+        other_earners_income = cf_params.base_earnings * (cf_params.num_earners - 1)
+        total_household_income = control_income + other_earners_income
+        per_person_consumption = total_household_income / cf_params.household_size_counterfactual
+        
+        # Project forward for remaining years
+        for i in range(remaining_years):
+            projection_idx = current_data_years + i
+            years_into_projection = i + 1
+            
+            # Calculate projected deflator (compound inflation from last known year)
+            projected_deflator = last_deflator * ((1 + inflation_rate) ** years_into_projection)
+            
+            # Project counterfactual earnings (always continues)
+            extended_counterfactual[projection_idx] = per_person_consumption * projected_deflator
+            
+            # Project earnings based on student status at end of simulation
+            if student.is_home or (student.german_learning_years > 0 and not student.in_germany):
+                # Student is at home - earn counterfactual (plus any treatment effect)
+                extended_earnings[projection_idx] = extended_counterfactual[projection_idx]
+                if student.is_graduated and cf_params.returner_treatment_effect > 0:
+                    hh_size = cf_params.household_size_counterfactual
+                    per_person_treatment = cf_params.returner_treatment_effect / hh_size
+                    extended_earnings[projection_idx] += per_person_treatment * projected_deflator
+            elif student.is_graduated and student.earnings_power > 0:
+                # Graduate working in Germany - project earnings with growth
+                growth_rate = student.degree.experience_growth + inflation_rate
+                projected_power = student.earnings_power * ((1 + growth_rate) ** years_into_projection)
+                max_earnings = student.degree.mean_earnings * 1.5 * projected_deflator
+                extended_earnings[projection_idx] = min(projected_power, max_earnings)
+                extended_employment[projection_idx] = True
+            elif not student.is_graduated:
+                # Still in studies at simulation end - project based on current status
+                # Assume they will eventually graduate and start earning
+                years_until_graduation = (student.german_learning_years + student.actual_years_to_complete) - current_data_years
+                if years_into_projection <= years_until_graduation:
+                    # Still studying
+                    if student.german_learning_years > 0 and student.study_income > 0:
+                        extended_earnings[projection_idx] = student.study_income * projected_deflator
+                    elif student.stipend_income > 0:
+                        extended_earnings[projection_idx] = student.stipend_income * projected_deflator
+                else:
+                    # Post-graduation projection
+                    years_post_grad = years_into_projection - years_until_graduation
+                    if student.will_return_home:
+                        # Will return home after graduation
+                        extended_earnings[projection_idx] = extended_counterfactual[projection_idx]
+                        if cf_params.returner_treatment_effect > 0:
+                            hh_size = cf_params.household_size_counterfactual
+                            per_person_treatment = cf_params.returner_treatment_effect / hh_size
+                            extended_earnings[projection_idx] += per_person_treatment * projected_deflator
+                    else:
+                        # Will work in Germany
+                        initial_salary = student.degree.mean_earnings * projected_deflator
+                        growth_rate = student.degree.experience_growth + inflation_rate
+                        projected_earnings = initial_salary * ((1 + growth_rate) ** years_post_grad)
+                        max_earnings = student.degree.mean_earnings * 1.5 * projected_deflator
+                        extended_earnings[projection_idx] = min(projected_earnings, max_earnings)
+                        extended_employment[projection_idx] = True
+            else:
+                # Fallback - use counterfactual
+                extended_earnings[projection_idx] = extended_counterfactual[projection_idx]
+        
+        # Replace student arrays with extended versions
+        student.earnings = extended_earnings
+        student.counterfactual_earnings = extended_counterfactual
+        student.payments = extended_payments
+        student.real_payments = extended_real_payments
+        student.employment_history = extended_employment
+
 
 def _calculate_graduation_delay(base_years_to_complete: int, degree_name: str = '') -> int:
     """

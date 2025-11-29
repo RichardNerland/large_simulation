@@ -199,12 +199,18 @@ def create_landing_page():
                 
                 html.Ul([
                     html.Li([html.Strong("Percentile Tables: "), "View detailed metrics across different percentile scenarios"]),
-                    html.Li([html.Strong("Impact Metrics (Utils): "), "Analyze total utility generated across scenarios"]),
-                    html.Li([html.Strong("Earnings by Degree: "), "View yearly breakdown of earnings, counterfactual earnings, and remittances by degree type to verify income calculations"]),
+                    html.Li([html.Strong("Impact Metrics (Utils): "), "Analyze total utility generated across scenarios (includes projected lifetime earnings)"]),
+                    html.Li([html.Strong("Earnings by Degree: "), "View yearly breakdown of earnings during the 55-year simulation period by degree type"]),
                     html.Li([html.Strong("Yearly Cash Flow: "), "Review detailed yearly cash flow projections for the median (P50) scenario"]),
-                    html.Li([html.Strong("NPV PPP Adjusted: "), "Compare NPV PPP adjusted economic impact between programs"]),
+                    html.Li([html.Strong("NPV PPP Adjusted: "), "Compare NPV PPP adjusted economic impact between programs (includes projected lifetime earnings)"]),
                     html.Li([html.Strong("GiveWell Comparison: "), "Compare the ISA program's impact to GiveDirectly's cash transfer programs, using GiveWell's framework for measuring cost-effectiveness"])
                 ], style={'fontSize': '16px', 'lineHeight': '1.6', 'paddingLeft': '30px'}),
+                
+                html.P([
+                    html.Strong("Note: "), 
+                    "Impact metrics and utility calculations include projected earnings for each student's full lifetime (to age 81.4), ",
+                    "ensuring students enrolled later in the simulation still have their complete ~60-year impact captured."
+                ], style={'fontSize': '14px', 'lineHeight': '1.6', 'fontStyle': 'italic', 'marginTop': '10px'}),
                 
                 html.H3("Understanding the GiveWell Comparison", style={'color': '#2c3e50', 'marginTop': '25px'}),
                 html.P([
@@ -385,12 +391,31 @@ def create_landing_page():
                 ], style={'fontSize': '16px', 'lineHeight': '1.6'}),
                 
                 html.Ul([
-                    html.Li([html.Strong("Simulation Length: "), "30-year time horizon to capture full career and repayment cycles"]),
+                    html.Li([html.Strong("Simulation Length: "), "55-year time horizon for ISA payments and financial tracking"]),
                     html.Li([html.Strong("Student Cohorts: "), "Students enter the program in year 1 and begin earning upon graduation"]),
                     html.Li([html.Strong("Payment Timing: "), "ISA payments begin the year after graduation if income exceeds threshold"]),
                     html.Li([html.Strong("Degree Distribution: "), "Percentile scenarios (P10, P25, P50, P75, P90) represent different distributions of student outcomes"]),
                     html.Li([html.Strong("Monte Carlo Elements: "), "Individual student earnings, graduation timing, and economic conditions include random variation"])
                 ], style={'fontSize': '16px', 'lineHeight': '1.6', 'paddingLeft': '30px'}),
+                
+                html.H3("Lifetime Earnings Projection", style={'color': '#2c3e50', 'marginTop': '25px'}),
+                html.P([
+                    "To accurately capture the full impact of the program, the model projects each student's earnings beyond the 55-year simulation period to their full working lifetime:"
+                ], style={'fontSize': '16px', 'lineHeight': '1.6'}),
+                
+                html.Ul([
+                    html.Li([html.Strong("Full Lifetime Coverage: "), "Each student's earnings are projected to life expectancy (81.4 years), ensuring ~60 years of higher consumption is captured"]),
+                    html.Li([html.Strong("Why This Matters: "), "Students enrolled later in the simulation (via ISA reinvestment) would otherwise have truncated earnings data. A student funded in year 40 would only have 15 years of data without projection."]),
+                    html.Li([html.Strong("Projection Method: "), "After the simulation ends, remaining years are projected using the student's last known earnings level, degree-specific growth rates, and inflation adjustments"]),
+                    html.Li([html.Strong("Consistent Treatment: "), "Both treatment earnings (in Germany) and counterfactual earnings (home country) are projected forward, ensuring accurate lifetime utility calculations"]),
+                    html.Li([html.Strong("Discounting: "), "All projected earnings are properly discounted back to present value using the 4% annual discount rate"])
+                ], style={'fontSize': '16px', 'lineHeight': '1.6', 'paddingLeft': '30px'}),
+                
+                html.P([
+                    html.Strong("Example: "), 
+                    "A student starting at age 22 in simulation year 40 would have 15 years of simulated data (years 40-55). ",
+                    "The projection extends this by 44 additional years (to age 81.4), capturing their full lifetime earnings gain versus counterfactual."
+                ], style={'fontSize': '14px', 'lineHeight': '1.6', 'fontStyle': 'italic', 'marginTop': '15px'}),
                 
                 
                 html.H2("Labor Force and Repayment Modeling Assumptions", style={'color': '#2c3e50', 'borderBottom': '2px solid #3498db', 'paddingBottom': '10px', 'marginTop': '30px'}),

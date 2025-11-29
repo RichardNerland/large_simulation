@@ -1089,7 +1089,12 @@ dashboard_layout = html.Div([
                                         "This graph shows the total utility (in utils) generated across different percentile scenarios. ",
                                         "It breaks down utility into student utility and remittance utility components, with the total utility (including additional effects) shown as points. ",
                                         "Utils are a measure of welfare benefit that incorporate GiveWell's approach to measuring social impact."
-                                    ])
+                                    ]),
+                                    html.P([
+                                        html.Strong("Note: "),
+                                        "Utility calculations include projected earnings for each student's full lifetime (to age 81.4), ",
+                                        "ensuring students enrolled later in the simulation still have their complete ~60-year impact captured."
+                                    ], style={'fontSize': '14px', 'fontStyle': 'italic', 'marginTop': '10px'})
                                 ], style={'padding': '10px', 'backgroundColor': '#f9f9f9', 'borderRadius': '5px', 'marginBottom': '15px'}),
                                 dcc.Graph(id='impact-metrics-graph')
                             ]),
@@ -1100,7 +1105,12 @@ dashboard_layout = html.Div([
                                         "This table shows the yearly breakdown of average earnings, counterfactual earnings, and remittances by degree type. ",
                                         "Use this to verify that stipend income, study income, counterfactual earnings, and remittances are being correctly calculated. ",
                                         "The table also shows the count of students and their status (graduated, in Germany, at home)."
-                                    ])
+                                    ]),
+                                    html.P([
+                                        html.Strong("Note: "),
+                                        "This table shows data from the 55-year simulation period only. Impact metrics include additional projected years ",
+                                        "to capture each student's full lifetime earnings (to age 81.4)."
+                                    ], style={'fontSize': '14px', 'fontStyle': 'italic', 'marginTop': '10px'})
                                 ], style={'padding': '10px', 'backgroundColor': '#f9f9f9', 'borderRadius': '5px', 'marginBottom': '15px'}),
                                 html.Div(id='earnings-by-degree-table')
                             ]),
@@ -1119,8 +1129,9 @@ dashboard_layout = html.Div([
                                 html.Div([
                                     html.H4("NPV PPP Adjusted Comparison"),
                                     html.P([
-                                        "This section provides separate analyses of GiveDirectly and Malengo's ISA programs in NPV PPP adjusted terms. "
-                                        
+                                        "This section provides separate analyses of GiveDirectly and Malengo's ISA programs in NPV PPP adjusted terms. ",
+                                        "ISA program values include projected earnings for each student's full lifetime (to age 81.4), ",
+                                        "ensuring complete ~60-year impact is captured regardless of when students enrolled in the simulation."
                                     ])
                                 ], style={'padding': '10px', 'backgroundColor': '#f9f9f9', 'borderRadius': '5px', 'marginBottom': '15px'}),
                                 
@@ -1946,7 +1957,12 @@ def update_results(n_clicks, program_type, initial_investment,
             html.H4("Simulation Information"),
             html.P(f"Program Type: {program_type}"),
             html.P(f"Initial Investment: ${initial_investment:,}"),
-            html.P(f"Simulation Length: 55 years")
+            html.P(f"Simulation Length: 55 years"),
+            html.P([
+                html.Strong("Lifetime Projection: "),
+                "Student earnings are projected to life expectancy (81.4 years) to capture full lifetime impact, ",
+                "ensuring students enrolled later in the simulation still have their complete ~60 years of earnings captured."
+            ], style={'fontSize': '14px', 'fontStyle': 'italic', 'color': '#666'})
         ], style={'marginTop': '20px'})
     ])
     
