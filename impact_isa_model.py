@@ -74,6 +74,12 @@ class ImpactParams:
     migration_influence_factor: float = 0.05  # Additional people who migrate due to observing success
     moral_weight: float = 1.44  # Moral weight (alpha) for direct income effects, based on GiveWell's approach
     eur_to_usd: float = 0.8458  # Exchange rate: EUR per USD (GiveWell analysis). EUR earnings ÷ this = USD equivalent
+    # Pension parameters
+    pension_years: int = 15  # Number of final years with reduced (pension) income
+    pension_rate: float = 0.60  # Pension income as fraction of pre-retirement earnings (60%)
+    # Remittance decay parameters
+    years_until_remittance_decay: int = 25  # Years in Germany before remittance rate decays
+    post_decay_remittance_rate: float = 0.0  # Remittance rate after decay (0% = stop sending remittances)
 
 def calculate_utility(income: float) -> float:
     """Calculate log utility for a given income level."""
@@ -156,6 +162,12 @@ class Student:
         # Track peak earnings
         self.peak_earnings = 0
         self.peak_earnings_age = 0
+        
+        # Track years in Germany (for remittance decay)
+        self.years_in_germany = 0
+        
+        # Track pre-retirement earnings (for pension calculation)
+        self.pre_retirement_earnings = 0
         
         # Add missing attributes
         self.id = None
@@ -297,6 +309,14 @@ class Student:
         
         # Increment years of experience
         self.years_experience += 1
+        
+        # Track years in Germany (for remittance decay calculation)
+        if self.in_germany and self.is_graduated:
+            self.years_in_germany += 1
+        
+        # Store pre-retirement earnings before applying pension reduction
+        if self.current_age < self.life_expectancy - 15:
+            self.pre_retirement_earnings = self.earnings_power
         
         return self.earnings_power
 
@@ -689,21 +709,57 @@ def calculate_student_statistics(student: Student, num_years: int, remittance_ra
     - student.counterfactual_earnings: USD (home country)
     - Remittances are calculated on EUR earnings, then converted to USD for utility calculations
     - The eur_to_usd rate is EUR per USD (0.8458), so: EUR_amount / eur_to_usd = USD_amount
+    
+    Note on pension and remittance adjustments:
+    - Pension reduction: In final 15 years (age >= life_expectancy - pension_years), 
+      earnings drop to pension_rate (60%) of pre-retirement earnings
+    - Remittance decay: After years_until_remittance_decay (25 years) in Germany,
+      remittance rate drops to post_decay_remittance_rate (0%)
     """
     # FX conversion rate (EUR to USD)
     eur_to_usd = impact_params.eur_to_usd
     
-    # Convert EUR earnings to USD for comparison with counterfactual
-    # student.earnings are in EUR (German salaries)
-    # student.counterfactual_earnings are in USD (home country earnings)
-    # eur_to_usd is EUR per USD (0.8458), so divide EUR by rate to get USD
-    earnings_usd = student.earnings / eur_to_usd
+    # Get pension and remittance decay parameters
+    pension_years = impact_params.pension_years  # Default 15
+    pension_rate = impact_params.pension_rate  # Default 0.60
+    years_until_remittance_decay = impact_params.years_until_remittance_decay  # Default 25
+    post_decay_remittance_rate = impact_params.post_decay_remittance_rate  # Default 0.0
+    
+    # Calculate adjusted earnings with pension reduction
+    # Apply pension reduction in final 15 years of life for students in Germany
+    adjusted_earnings = np.copy(student.earnings)
+    
+    # Find the pre-retirement earnings (last earnings before pension period)
+    # This is the earnings at age (life_expectancy - pension_years - 1)
+    pre_retirement_idx = None
+    pre_retirement_earnings_eur = 0
+    
+    for idx in range(len(student.earnings)):
+        current_age = student.starting_age + idx
+        # Track pre-retirement earnings (earnings just before pension age)
+        if current_age < student.life_expectancy - pension_years:
+            if student.earnings[idx] > 0 and not student.is_home:
+                pre_retirement_earnings_eur = student.earnings[idx]
+                pre_retirement_idx = idx
+    
+    # Apply pension reduction for years in pension period
+    for idx in range(len(adjusted_earnings)):
+        current_age = student.starting_age + idx
+        # Check if in pension period (final 15 years of life)
+        if current_age >= student.life_expectancy - pension_years:
+            # Only apply pension if student was working in Germany (not at home)
+            if pre_retirement_earnings_eur > 0 and not student.is_home:
+                # Pension is 60% of pre-retirement earnings
+                adjusted_earnings[idx] = pre_retirement_earnings_eur * pension_rate
+    
+    # Convert adjusted EUR earnings to USD for comparison with counterfactual
+    earnings_usd = adjusted_earnings / eur_to_usd
     
     # Calculate lifetime earnings in USD (undiscounted sum)
     lifetime_earnings_usd = np.sum(earnings_usd)
     
     # Keep EUR earnings for reference (ISA calculations use EUR)
-    lifetime_earnings_eur = np.sum(student.earnings)
+    lifetime_earnings_eur = np.sum(adjusted_earnings)
     
     # Calculate real (present value) earnings in USD, discounted to absolute simulation year 0
     if len(earnings_usd) == 0:
@@ -717,10 +773,38 @@ def calculate_student_statistics(student: Student, num_years: int, remittance_ra
     # Calculate counterfactual lifetime earnings (undiscounted sum) - already in USD
     counterfactual_lifetime_earnings = np.sum(student.counterfactual_earnings) 
 
-    # Calculate remittances in USD
-    # Remittances are sent from EUR earnings, converted to USD for receiving household
-    # remittance_rate is applied to EUR earnings, then converted to USD
-    lifetime_remittances_eur = lifetime_earnings_eur * remittance_rate
+    # Calculate remittances with decay after 25 years in Germany
+    # Track years working in Germany for remittance decay
+    years_working_in_germany = 0
+    total_remittances_eur = 0
+    
+    for idx in range(len(adjusted_earnings)):
+        current_age = student.starting_age + idx
+        earnings_this_year = adjusted_earnings[idx]
+        
+        # Check if student is working in Germany (graduated, not home, earning money)
+        is_working_in_germany = (
+            student.is_graduated and 
+            not student.is_home and 
+            earnings_this_year > 0 and
+            idx >= student.german_learning_years + student.actual_years_to_complete
+        )
+        
+        if is_working_in_germany:
+            years_working_in_germany += 1
+            
+            # Determine remittance rate based on years in Germany
+            if years_working_in_germany > years_until_remittance_decay:
+                effective_remittance_rate = post_decay_remittance_rate
+            else:
+                effective_remittance_rate = remittance_rate
+            
+            total_remittances_eur += earnings_this_year * effective_remittance_rate
+        else:
+            # Not working in Germany - no remittances from German earnings
+            pass
+    
+    lifetime_remittances_eur = total_remittances_eur
     lifetime_remittances_usd = lifetime_remittances_eur / eur_to_usd
     counterfactual_remittances = counterfactual_lifetime_earnings * impact_params.counterfactual.remittance_rate
     
@@ -732,18 +816,38 @@ def calculate_student_statistics(student: Student, num_years: int, remittance_ra
     # Get household parameters from counterfactual params
     cf_params = impact_params.counterfactual
     
-    for idx_relative_to_student_earnings in range(len(student.earnings)):
+    # Reset years tracking for utility calculations
+    years_working_in_germany = 0
+    
+    for idx_relative_to_student_earnings in range(len(adjusted_earnings)):
         absolute_simulation_year = student.start_year + idx_relative_to_student_earnings
         discount_factor = (1 / (1 + impact_params.discount_rate)) ** absolute_simulation_year
         
         # Convert this year's EUR earnings to USD (divide by EUR per USD rate)
-        year_earnings_usd = student.earnings[idx_relative_to_student_earnings] / eur_to_usd
+        year_earnings_usd = adjusted_earnings[idx_relative_to_student_earnings] / eur_to_usd
+        
+        # Determine if working in Germany this year
+        is_working_in_germany = (
+            student.is_graduated and 
+            not student.is_home and 
+            adjusted_earnings[idx_relative_to_student_earnings] > 0 and
+            idx_relative_to_student_earnings >= student.german_learning_years + student.actual_years_to_complete
+        )
+        
+        if is_working_in_germany:
+            years_working_in_germany += 1
+        
+        # Determine effective remittance rate for this year
+        if is_working_in_germany and years_working_in_germany > years_until_remittance_decay:
+            year_remittance_rate = post_decay_remittance_rate
+        else:
+            year_remittance_rate = remittance_rate
         
         # Calculate per-year undiscounted utilities (all in USD)
         year_utils = calculate_total_utility(
             year_earnings_usd,  # USD
             student.counterfactual_earnings[idx_relative_to_student_earnings],  # USD
-            remittance_rate,  # Rate applied to USD earnings
+            year_remittance_rate,  # Rate applied to USD earnings (may be decayed)
             impact_params.moral_weight,
             base_earner_income=cf_params.base_earnings,  # USD
             num_earners=cf_params.num_earners,
@@ -1595,12 +1699,21 @@ def project_remaining_lifetime(students: List, year: 'Year', impact_params: Impa
     - A student enrolled in year 40 with only 15 years of data needs ~44 more years
       to capture their full lifetime impact
     
+    Pension and remittance adjustments:
+    - Pension reduction: In final 15 years (age >= life_expectancy - pension_years), 
+      earnings drop to pension_rate (60%) of pre-retirement earnings
+    - Remittance decay is handled in calculate_student_statistics based on years in Germany
+    
     Args:
         students: List of Student objects to project
         year: Year object with current economic parameters (inflation rate, deflator)
         impact_params: Impact parameters including counterfactual params
         simulation_end_year: The last year of the simulation (typically num_years)
     """
+    # Get pension parameters
+    pension_years = impact_params.pension_years  # Default 15
+    pension_rate = impact_params.pension_rate  # Default 0.60
+    
     for student in students:
         # Calculate how many years of data we have vs how many we need
         current_data_years = len(student.earnings)
@@ -1639,10 +1752,31 @@ def project_remaining_lifetime(students: List, year: 'Year', impact_params: Impa
         total_household_income = control_income + other_earners_income
         per_person_consumption = total_household_income / cf_params.household_size_counterfactual
         
+        # Find pre-retirement earnings from existing data (for pension calculation)
+        # This is the last working earnings before pension age
+        pre_retirement_earnings = 0
+        pension_start_age = student.life_expectancy - pension_years
+        
+        for idx in range(current_data_years):
+            current_age = student.starting_age + idx
+            if current_age < pension_start_age:
+                if student.earnings[idx] > 0 and not student.is_home:
+                    pre_retirement_earnings = student.earnings[idx]
+        
+        # If no pre-retirement earnings found in existing data, use earnings_power
+        if pre_retirement_earnings == 0 and student.earnings_power > 0 and not student.is_home:
+            pre_retirement_earnings = student.earnings_power
+        
         # Project forward for remaining years
         for i in range(remaining_years):
             projection_idx = current_data_years + i
             years_into_projection = i + 1
+            
+            # Calculate age at this projection year
+            projected_age = age_at_data_end + years_into_projection
+            
+            # Check if in pension period (final 15 years of life)
+            in_pension_period = projected_age >= pension_start_age
             
             # Calculate projected deflator (compound inflation from last known year)
             projected_deflator = last_deflator * ((1 + inflation_rate) ** years_into_projection)
@@ -1660,10 +1794,20 @@ def project_remaining_lifetime(students: List, year: 'Year', impact_params: Impa
                     extended_earnings[projection_idx] += per_person_treatment * projected_deflator
             elif student.is_graduated and student.earnings_power > 0:
                 # Graduate working in Germany - project earnings with growth
-                growth_rate = student.degree.experience_growth + inflation_rate
-                projected_power = student.earnings_power * ((1 + growth_rate) ** years_into_projection)
-                max_earnings = student.degree.mean_earnings * 1.5 * projected_deflator
-                extended_earnings[projection_idx] = min(projected_power, max_earnings)
+                if in_pension_period and pre_retirement_earnings > 0:
+                    # In pension period - use 60% of pre-retirement earnings
+                    # Adjust pre-retirement earnings for inflation
+                    inflation_adjusted_pre_retirement = pre_retirement_earnings * ((1 + inflation_rate) ** years_into_projection)
+                    extended_earnings[projection_idx] = inflation_adjusted_pre_retirement * pension_rate
+                else:
+                    # Still working - project earnings with growth
+                    growth_rate = student.degree.experience_growth + inflation_rate
+                    projected_power = student.earnings_power * ((1 + growth_rate) ** years_into_projection)
+                    max_earnings = student.degree.mean_earnings * 1.5 * projected_deflator
+                    extended_earnings[projection_idx] = min(projected_power, max_earnings)
+                    # Update pre-retirement earnings if not yet in pension period
+                    if not in_pension_period:
+                        pre_retirement_earnings = extended_earnings[projection_idx]
                 extended_employment[projection_idx] = True
             elif not student.is_graduated:
                 # Still in studies at simulation end - project based on current status
@@ -1687,11 +1831,27 @@ def project_remaining_lifetime(students: List, year: 'Year', impact_params: Impa
                             extended_earnings[projection_idx] += per_person_treatment * projected_deflator
                     else:
                         # Will work in Germany
-                        initial_salary = student.degree.mean_earnings * projected_deflator
-                        growth_rate = student.degree.experience_growth + inflation_rate
-                        projected_earnings = initial_salary * ((1 + growth_rate) ** years_post_grad)
-                        max_earnings = student.degree.mean_earnings * 1.5 * projected_deflator
-                        extended_earnings[projection_idx] = min(projected_earnings, max_earnings)
+                        if in_pension_period:
+                            # In pension period - use 60% of projected pre-retirement earnings
+                            initial_salary = student.degree.mean_earnings * projected_deflator
+                            growth_rate = student.degree.experience_growth + inflation_rate
+                            # Calculate what pre-retirement earnings would have been
+                            years_working_before_pension = int(pension_start_age - (student.starting_age + student.german_learning_years + student.actual_years_to_complete))
+                            if years_working_before_pension > 0:
+                                pre_ret_earnings = initial_salary * ((1 + growth_rate) ** years_working_before_pension)
+                                max_earnings = student.degree.mean_earnings * 1.5 * projected_deflator
+                                pre_ret_earnings = min(pre_ret_earnings, max_earnings)
+                                extended_earnings[projection_idx] = pre_ret_earnings * pension_rate
+                            else:
+                                # Graduated directly into pension - use initial salary * pension rate
+                                extended_earnings[projection_idx] = initial_salary * pension_rate
+                        else:
+                            # Still working
+                            initial_salary = student.degree.mean_earnings * projected_deflator
+                            growth_rate = student.degree.experience_growth + inflation_rate
+                            projected_earnings = initial_salary * ((1 + growth_rate) ** years_post_grad)
+                            max_earnings = student.degree.mean_earnings * 1.5 * projected_deflator
+                            extended_earnings[projection_idx] = min(projected_earnings, max_earnings)
                         extended_employment[projection_idx] = True
             else:
                 # Fallback - use counterfactual
@@ -1828,7 +1988,13 @@ def main():
         ppp_multiplier=0.42,
         health_benefit_per_euro=0.00003,
         migration_influence_factor=0.05,
-        moral_weight=1.44
+        moral_weight=1.44,
+        # Pension reduction: In final 15 years, earnings drop to 60% (pension income)
+        pension_years=15,
+        pension_rate=0.60,
+        # Remittance decay: After 25 years in Germany, remittances drop to 0%
+        years_until_remittance_decay=25,
+        post_decay_remittance_rate=0.0
     )
     
     # Run simulation

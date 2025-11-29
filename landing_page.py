@@ -338,7 +338,7 @@ def create_landing_page():
                     html.Li([html.Strong("Labor Market Exit: "), "10% probability of returning to home country for most degrees, 100% for failed tracks"]),
                     html.Li([html.Strong("Immigrant Wage Penalty: "), "Approximately 20% earnings reduction implicit in the salary parameters"]),
                     html.Li([html.Strong("Career Progression: "), "Annual salary growth rates vary by degree type and are subject to inflation adjustments"]),
-                    html.Li([html.Strong("Pension Smoothing: "), "Scholars working in Germany earn a state pension that provides income smoothing past retirement. The model uses a life expectancy of 81.4 years, with pension income continuing until end of life based on contributions made during working years."])
+                    html.Li([html.Strong("Pension Income: "), "Scholars working in Germany earn a state pension. In the final 15 years of life (ages ~66-81), income drops to 60% of pre-retirement earnings to reflect pension replacement rates. The model uses a life expectancy of 81.4 years."])
                 ], style={'fontSize': '16px', 'lineHeight': '1.6', 'paddingLeft': '30px'}),
                 
                 html.H3("Financial and Impact Calculation Parameters", style={'color': '#2c3e50', 'marginTop': '25px'}),
@@ -378,7 +378,7 @@ def create_landing_page():
                             html.Li("Remittances received are in $ (converted from € at 0.8458 rate)")
                         ], style={'paddingLeft': '30px'})
                     ]),
-                    html.Li([html.Strong("Remittance Rate: "), "8% of € income sent as remittances, converted to $ for home country"]),
+                    html.Li([html.Strong("Remittance Rate: "), "8% of € income sent as remittances for first 25 years, then 0% (decay after 25 years in Germany)"]),
                     html.Li([html.Strong("Health Benefits: "), "0.00003 health utility per euro of additional income (based on GiveWell methodology)"]),
                     html.Li([html.Strong("Migration Influence: "), "5% factor for spillover effects from observing migration success"]),
                     html.Li([html.Strong("Moral Weight: "), "Value of 1 is the value of doubling consumption for one person for one year, alpha parameter for direct income effects (GiveWell framework)"]),
@@ -416,6 +416,37 @@ def create_landing_page():
                     "A student starting at age 22 in simulation year 40 would have 15 years of simulated data (years 40-55). ",
                     "The projection extends this by 44 additional years (to age 81.4), capturing their full lifetime earnings gain versus counterfactual."
                 ], style={'fontSize': '14px', 'lineHeight': '1.6', 'fontStyle': 'italic', 'marginTop': '15px'}),
+                
+                html.H3("Pension and Remittance Adjustments", style={'color': '#2c3e50', 'marginTop': '25px'}),
+                html.P([
+                    "The model applies two important adjustments that reduce impact estimates to be more conservative and realistic:"
+                ], style={'fontSize': '16px', 'lineHeight': '1.6'}),
+                
+                html.H4("Pension Reduction (Final 15 Years)", style={'color': '#2c3e50', 'marginTop': '20px'}),
+                html.P([
+                    "In the final 15 years of a student's life (approximately ages 66-81), earnings for those working in Germany are reduced to reflect pension income:"
+                ], style={'fontSize': '16px', 'lineHeight': '1.6'}),
+                html.Ul([
+                    html.Li([html.Strong("Pension Rate: "), "60% of pre-retirement earnings"]),
+                    html.Li([html.Strong("Applies To: "), "Students who remained in Germany after graduation (not those who returned home)"]),
+                    html.Li([html.Strong("Rationale: "), "German state pension typically replaces ~48-55% of pre-retirement income; 60% is used as a conservative estimate accounting for private savings"])
+                ], style={'fontSize': '16px', 'lineHeight': '1.6', 'paddingLeft': '30px'}),
+                
+                html.H4("Remittance Decay (After 25 Years)", style={'color': '#2c3e50', 'marginTop': '20px'}),
+                html.P([
+                    "After 25 years of working in Germany, the model assumes remittances to the home country cease:"
+                ], style={'fontSize': '16px', 'lineHeight': '1.6'}),
+                html.Ul([
+                    html.Li([html.Strong("Initial Remittance Rate: "), "8% of earnings for the first 25 years"]),
+                    html.Li([html.Strong("Post-Decay Rate: "), "0% after 25 years working in Germany"]),
+                    html.Li([html.Strong("Rationale: "), "As migrants spend more time abroad, family ties typically weaken, parents may pass away, and financial obligations to home country diminish. This is a conservative assumption that reduces estimated impact."])
+                ], style={'fontSize': '16px', 'lineHeight': '1.6', 'paddingLeft': '30px'}),
+                
+                html.P([
+                    html.Strong("Impact on Analysis: "),
+                    "These adjustments reduce total utility estimates compared to assuming constant earnings and remittances throughout life. ",
+                    "This provides a more realistic and conservative assessment of the program's true lifetime impact."
+                ], style={'fontSize': '14px', 'lineHeight': '1.6', 'fontStyle': 'italic', 'marginTop': '15px', 'backgroundColor': '#fff5f5', 'padding': '10px', 'borderRadius': '5px'}),
                 
                 
                 html.H2("Labor Force and Repayment Modeling Assumptions", style={'color': '#2c3e50', 'borderBottom': '2px solid #3498db', 'paddingBottom': '10px', 'marginTop': '30px'}),

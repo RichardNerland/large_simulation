@@ -52,7 +52,13 @@ impact_params = ImpactParams(
     health_benefit_per_euro=0.00003,
     migration_influence_factor=0.05,
     moral_weight=1.44,
-    eur_to_usd=0.8458  # GiveWell exchange rate: USD per EUR
+    eur_to_usd=0.8458,  # GiveWell exchange rate: USD per EUR
+    # Pension reduction: In final 15 years, earnings drop to 60% (pension income)
+    pension_years=15,
+    pension_rate=0.60,
+    # Remittance decay: After 25 years in Germany, remittances drop to 0%
+    years_until_remittance_decay=25,
+    post_decay_remittance_rate=0.0
 )
 
 # Cache for precomputed percentile scenarios
@@ -1091,9 +1097,9 @@ dashboard_layout = html.Div([
                                         "Utils are a measure of welfare benefit that incorporate GiveWell's approach to measuring social impact."
                                     ]),
                                     html.P([
-                                        html.Strong("Note: "),
-                                        "Utility calculations include projected earnings for each student's full lifetime (to age 81.4), ",
-                                        "ensuring students enrolled later in the simulation still have their complete ~60-year impact captured."
+                                        html.Strong("Adjustments Applied: "),
+                                        "Calculations include: (1) projected earnings to age 81.4, (2) pension reduction to 60% in final 15 years, ",
+                                        "and (3) remittance decay to 0% after 25 years working in Germany."
                                     ], style={'fontSize': '14px', 'fontStyle': 'italic', 'marginTop': '10px'})
                                 ], style={'padding': '10px', 'backgroundColor': '#f9f9f9', 'borderRadius': '5px', 'marginBottom': '15px'}),
                                 dcc.Graph(id='impact-metrics-graph')
@@ -1960,8 +1966,15 @@ def update_results(n_clicks, program_type, initial_investment,
             html.P(f"Simulation Length: 55 years"),
             html.P([
                 html.Strong("Lifetime Projection: "),
-                "Student earnings are projected to life expectancy (81.4 years) to capture full lifetime impact, ",
-                "ensuring students enrolled later in the simulation still have their complete ~60 years of earnings captured."
+                "Student earnings are projected to life expectancy (81.4 years) to capture full lifetime impact."
+            ], style={'fontSize': '14px', 'fontStyle': 'italic', 'color': '#666'}),
+            html.P([
+                html.Strong("Pension Adjustment: "),
+                "In the final 15 years of life, earnings in Germany drop to 60% of pre-retirement income (pension)."
+            ], style={'fontSize': '14px', 'fontStyle': 'italic', 'color': '#666'}),
+            html.P([
+                html.Strong("Remittance Decay: "),
+                "After 25 years working in Germany, remittance rate drops to 0% (assumed family integration)."
             ], style={'fontSize': '14px', 'fontStyle': 'italic', 'color': '#666'})
         ], style={'marginTop': '20px'})
     ])
